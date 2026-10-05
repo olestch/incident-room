@@ -35,6 +35,7 @@ import {
 } from '@/features/incident-management/views';
 import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { AppError } from '@/shared/errors/app-error';
+import { TimelineRoom } from './timeline-room';
 
 export function IncidentPage({ number }: { number?: string }) {
   const { state } = useSessionRuntime();
@@ -180,9 +181,10 @@ function IdentityIncidentPage({
       router.push(`/app/incidents/${incident.number}`);
     },
   });
+  const hasContext = !!detail.data && !!users.data;
   useEffect(() => {
-    if (number && detail.data && users.data) document.getElementById('incident-heading')?.focus();
-  }, [number, detail.data, users.data]);
+    if (number && hasContext) document.getElementById('incident-heading')?.focus();
+  }, [number, hasContext]);
   const errorView = (error: Error, retry: () => void) => (
     <div role="alert" className="my-4">
       <p>
@@ -208,22 +210,33 @@ function IdentityIncidentPage({
         <Link className="underline" href="/app/incidents">
           Back to incidents
         </Link>
-        <div className="my-6">
-          {(detail.isPending || (detail.data && users.isPending)) && (
-            <p role="status">Loading incident…</p>
-          )}
-          {detail.isError && errorView(detail.error, () => void detail.refetch())}
-          {users.isError && errorView(users.error, () => void users.refetch())}
+        <div className="incident-room-layout">
+          <div className="my-6 min-w-0">
+            {(detail.isPending || (detail.data && users.isPending)) && (
+              <p role="status">Loading incident…</p>
+            )}
+            {detail.isError && errorView(detail.error, () => void detail.refetch())}
+            {users.isError && errorView(users.error, () => void users.refetch())}
+            {detail.data &&
+              users.data &&
+              !inaccessible(detail.error) &&
+              !inaccessible(users.error) && (
+                <IncidentContext incident={detail.data} users={users.data} detail />
+              )}
+          </div>
           {detail.data &&
             users.data &&
+            current.data &&
             !inaccessible(detail.error) &&
             !inaccessible(users.error) && (
-              <IncidentContext incident={detail.data} users={users.data} detail />
+              <TimelineRoom
+                key={detail.data.id}
+                incident={detail.data}
+                actor={current.data}
+                users={users.data}
+              />
             )}
         </div>
-        <p className="border-t border-line pt-5 text-muted">
-          Timeline functionality is coming in a later phase.
-        </p>
       </section>
     );
   const rows = list.data?.pages.flatMap((page) => page.items) ?? [];

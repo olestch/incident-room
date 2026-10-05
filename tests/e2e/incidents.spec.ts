@@ -108,7 +108,10 @@ test('create validates, preserves state on resize, navigates to real detail and 
   );
   await expect(page.getByLabel('Incident detail')).toContainText('Triggered');
   await expect(page.getByLabel('Incident detail')).toContainText('Aurora Edge');
-  await expect(page.getByText('Timeline functionality is coming in a later phase.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Timeline', exact: true })).toBeVisible();
+  await expect(
+    page.getByText('No Timeline entries yet. The first message will start this incident history.'),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Back to incidents', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Incidents', exact: true })).toContainText(
     'INC-2873',

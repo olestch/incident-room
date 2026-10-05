@@ -26,27 +26,17 @@ export function IncidentContext({
   detail?: boolean;
 }) {
   const name = (id: string) => users.find((u) => u.id === id)?.name ?? 'Unavailable workspace user';
-  return (
-    <div className="min-w-0 space-y-2 break-words">
-      <p className={`text-sm font-semibold severity-${incident.severity}`}>
-        <span>
-          {incident.severity} · {severityLabels[incident.severity]}
-        </span>{' '}
-        <span className="ml-2 rounded border border-line px-2 py-1 text-ink">
-          {statusLabels[incident.status]}
-        </span>
-      </p>
-      {detail ? (
-        <h1 tabIndex={-1} id="incident-heading" className="text-2xl font-semibold">
-          {incident.number} · {incident.title}
-        </h1>
-      ) : (
-        <h2 className="text-lg font-semibold">
-          <Link className="underline" href={`/app/incidents/${incident.number}`}>
-            {incident.number} · {incident.title}
-          </Link>
-        </h2>
-      )}
+  const [expanded, setExpanded] = useState(true);
+  useEffect(() => {
+    if (!detail || typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(min-width: 48rem)');
+    const sync = () => setExpanded(media.matches);
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, [detail]);
+  const metadata = (
+    <>
       {detail && (
         <p className="whitespace-pre-wrap">{incident.description || 'No description provided.'}</p>
       )}
@@ -77,6 +67,37 @@ export function IncidentContext({
         <p className="text-sm">
           Resolved <IncidentTime value={incident.resolvedAt} /> · Operational writes are closed.
         </p>
+      )}
+    </>
+  );
+  return (
+    <div className="min-w-0 space-y-2 break-words">
+      <p className={`text-sm font-semibold severity-${incident.severity}`}>
+        <span>
+          {incident.severity} · {severityLabels[incident.severity]}
+        </span>{' '}
+        <span className="ml-2 rounded border border-line px-2 py-1 text-ink">
+          {statusLabels[incident.status]}
+        </span>
+      </p>
+      {detail ? (
+        <h1 tabIndex={-1} id="incident-heading" className="text-2xl font-semibold">
+          {incident.number} · {incident.title}
+        </h1>
+      ) : (
+        <h2 className="text-lg font-semibold">
+          <Link className="underline" href={`/app/incidents/${incident.number}`}>
+            {incident.number} · {incident.title}
+          </Link>
+        </h2>
+      )}
+      {detail ? (
+        <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
+          <summary className="cursor-pointer py-2 font-semibold">Incident context</summary>
+          <div className="space-y-2">{metadata}</div>
+        </details>
+      ) : (
+        metadata
       )}
     </div>
   );

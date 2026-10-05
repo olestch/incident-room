@@ -21,6 +21,36 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+.timeline-viewport {
+  height: min(58dvh, 42rem);
+  min-height: 12rem;
+  overflow: auto;
+  overflow-anchor: none;
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+}
+.timeline-row {
+  list-style: none;
+  border-bottom: 1px solid var(--color-line);
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+.timeline-target {
+  border-left: 4px solid var(--color-focus);
+  background: #eff6ff;
+}
+.timeline-compose {
+  padding: 1rem 0 max(1rem, env(safe-area-inset-bottom));
+}
+@media (min-width: 64rem) {
+  .incident-room-layout {
+    display: grid;
+    grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+}
 
 .incident-input {
   display: block;

@@ -125,6 +125,14 @@ export class MockIncidentAuthority {
       return incident;
     });
   }
+  async recordActivity(actor: IncidentActor, number: string, time: string) {
+    await this.store.transact((data) => {
+      const incident = data.incidents.find((record) => record.number === number);
+      if (!incident || !canViewIncident(actor, incident))
+        throw new AppError('authorization', 'Access denied.', 403);
+      if (time > incident.updatedAt) incident.updatedAt = time;
+    });
+  }
   async create(actor: IncidentActor, raw: unknown, users: WorkspaceUser[], requestId: string) {
     if (!canCreateIncident(actor, actor.workspaceId))
       throw new AppError('authorization', 'Access denied.', 403);

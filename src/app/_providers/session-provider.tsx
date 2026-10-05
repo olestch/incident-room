@@ -8,6 +8,8 @@ import { HttpSessionAdapter } from '@/features/session/http-session-adapter';
 import { fictionalClientId, forgetFictionalClient } from '@/features/session/mock/browser';
 import { connectionChanged } from '@/features/realtime/connection-slice';
 import { AppError } from '@/shared/errors/app-error';
+import { LocalWorkService } from '@/features/timeline/local-work';
+import { localWorkCleared } from '@/features/timeline/coordination-slice';
 import { useAppDispatch, useAppSelector } from './hooks';
 
 const Context = createContext<{
@@ -16,6 +18,12 @@ const Context = createContext<{
   issue: string | null;
   retry(): void;
 } | null>(null);
+const LocalWorkContext = createContext<LocalWorkService | null>(null);
+export function useLocalWork() {
+  const work = useContext(LocalWorkContext);
+  if (!work) throw new Error('Local work runtime is not mounted');
+  return work;
+}
 export function SessionProvider({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
@@ -23,18 +31,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [attempt, setAttempt] = useState(0);
   const [runtime] = useState(() => {
     const adapter = new HttpSessionAdapter(fictionalClientId, '', undefined, forgetFictionalClient);
+    const work = new LocalWorkService();
     const coordinator = new SessionCoordinator(adapter, {
       changed: (state) => dispatch(sessionChanged(state)),
       activated: ({ user }) =>
         queryClient.setQueryData(currentUserKey(user.id, user.workspaceId), user),
-      cleared: () => {
+      cleared: (identity) => {
+        if (identity) void work.stop(identity);
+        dispatch(localWorkCleared());
         // Cancel then remove synchronously; generation checks guard even signal-ignoring work.
         void queryClient.cancelQueries({ queryKey: ['identity'] });
         queryClient.removeQueries({ queryKey: ['identity'] });
         dispatch(connectionChanged('offline'));
       },
     });
-    return { coordinator, adapter };
+    coordinator.registerLifecycle(work);
+    return { coordinator, adapter, work };
   });
   useEffect(() => {
     let active = true;
@@ -76,7 +88,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         },
       }}
     >
-      {children}
+      <LocalWorkContext value={runtime.work}>{children}</LocalWorkContext>
     </Context>
   );
 }

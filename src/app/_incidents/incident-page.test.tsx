@@ -5,6 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { useSyncExternalStore } from 'react';
+import { Provider } from 'react-redux';
+import { makeStore } from '@/app/_providers/store';
+import { LocalWorkService, emptyLocalData } from '@/features/timeline/local-work';
+import { MockTimelineAuthority, seedTimeline } from '@/features/timeline/authority';
+import { timelineHandlers } from '@/features/timeline/handlers';
+import { MemoryAtomicStore } from '@/shared/persistence/atomic-store';
+import { installVirtualLayout } from '@/shared/testing/virtual-layout';
+import { timelineKeys, type TimelineWindow } from '@/entities/timeline/model';
 import { currentUserKey } from '@/entities/current-user/model';
 import { incidentKeys } from '@/entities/incident/model';
 import { incidentPageSchema, incidentSchema } from '@/entities/incident/model';
@@ -22,7 +30,7 @@ import {
   MockIncidentAuthority,
 } from '@/features/incident-management/authority';
 import { incidentHandlers } from '@/features/incident-management/handlers';
-import { useSessionRuntime } from '@/app/_providers/session-provider';
+import { useSessionRuntime, useLocalWork } from '@/app/_providers/session-provider';
 import { IncidentPage } from './incident-page';
 
 const navigation = vi.hoisted(() => ({
@@ -45,7 +53,10 @@ vi.mock('next/navigation', () => ({
       ),
     ),
 }));
-vi.mock('@/app/_providers/session-provider', () => ({ useSessionRuntime: vi.fn() }));
+vi.mock('@/app/_providers/session-provider', () => ({
+  useSessionRuntime: vi.fn(),
+  useLocalWork: vi.fn(),
+}));
 const server = setupServer();
 let cache: QueryClient;
 let coordinator: SessionCoordinator;
@@ -55,6 +66,10 @@ const client = 'react-test-client';
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(async () => {
+  installVirtualLayout();
+  vi.mocked(useLocalWork).mockReturnValue(
+    new LocalWorkService(new MemoryAtomicStore(emptyLocalData)),
+  );
   navigation.search = '';
   navigation.listeners.clear();
   navigation.push.mockImplementation((url: string) => {
@@ -64,6 +79,16 @@ beforeEach(async () => {
   auth = new MockAuthAuthority(new MemoryAuthorityStore());
   authority = new MockIncidentAuthority(new MemoryIncidentStore());
   server.use(
+    ...timelineHandlers(
+      new MockTimelineAuthority(new MemoryAtomicStore(seedTimeline)),
+      async (id) => {
+        const session = await auth.current(id);
+        if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
+        return session.user;
+      },
+      (actor, number) => authority.detail(actor, number),
+      (actor, number, time) => authority.recordActivity(actor, number, time),
+    ),
     ...authHandlers(auth),
     ...incidentHandlers(
       authority,
@@ -120,7 +145,9 @@ afterEach(async () => {
 function mount(number?: string) {
   return render(
     <QueryClientProvider client={cache}>
-      <IncidentPage {...(number ? { number } : {})} />
+      <Provider store={makeStore()}>
+        <IncidentPage {...(number ? { number } : {})} />
+      </Provider>
     </QueryClientProvider>,
   );
 }
@@ -271,7 +298,7 @@ it('reads detail context and retries a network boundary', async () => {
   );
   await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }));
   expect(await screen.findByRole('heading', { name: /INC-2841/ })).toHaveFocus();
-  expect(screen.getByText('Timeline functionality is coming in a later phase.')).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Timeline' })).toBeVisible();
 });
 it('cancels superseded filter work so late results cannot replace current URL results', async () => {
   let release!: () => void;
@@ -434,4 +461,81 @@ it('hides cached incident context when authority revokes access, but retains ret
   });
   expect(await screen.findByRole('alert')).toHaveTextContent('Access denied.');
   expect(screen.queryByRole('heading', { name: /INC-2841/ })).not.toBeInTheDocument();
+});
+it('Timeline storage failure keeps actual editor text, draft ownership and never dispatches a mutation', async () => {
+  const work = vi.mocked(useLocalWork)();
+  vi.spyOn(work, 'handoff').mockRejectedValueOnce(new Error('Quota unavailable'));
+  const posts = vi.fn();
+  server.use(
+    http.post('*/mock-api/incidents/:number/timeline', () => {
+      posts();
+      return HttpResponse.error();
+    }),
+  );
+  mount('INC-2841');
+  const input = await screen.findByLabelText('Message');
+  await waitFor(() => expect(input).toBeEnabled());
+  await userEvent.setup().type(input, 'Fictional retained editor text');
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Send' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Your text remains in the editor');
+  expect(input).toHaveValue('Fictional retained editor text');
+  expect(posts).not.toHaveBeenCalled();
+});
+it('Timeline pagination error preserves confirmed window and retries the same opaque boundary', async () => {
+  mount('INC-2841');
+  const historyKey = timelineKeys.history('demo-sage', 'demo-orbit', 'fictional-incident-2841');
+  await waitFor(() =>
+    expect(
+      cache.getQueryData<{ pages: TimelineWindow[] }>(historyKey)?.pages[0]?.items,
+    ).toHaveLength(60),
+  );
+  const previous = cache.getQueryData<{ pages: TimelineWindow[] }>(historyKey)!;
+  const cursor = previous.pages[0]!.olderCursor;
+  const requests: string[] = [];
+  server.use(
+    http.get('*/mock-api/incidents/:number/timeline', ({ request }) => {
+      requests.push(new URL(request.url).searchParams.get('cursor') ?? '');
+      return HttpResponse.json(
+        { category: 'network', message: 'Fictional boundary unavailable.' },
+        { status: 503 },
+      );
+    }),
+  );
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Load older history' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load Timeline history');
+  expect(cache.getQueryData<{ pages: TimelineWindow[] }>(historyKey)?.pages[0]?.items).toEqual(
+    previous.pages[0]!.items,
+  );
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Retry history' }));
+  await waitFor(() => expect(requests).toEqual([cursor, cursor]));
+});
+it('a navigation flush cannot recreate a draft already moving atomically into the outbox', async () => {
+  const work = vi.mocked(useLocalWork)();
+  let release!: () => void;
+  const original = work.handoff.bind(work);
+  vi.spyOn(work, 'handoff').mockImplementation(async (lease, body) => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return original(lease, body);
+  });
+  const mounted = mount('INC-2841');
+  const input = await screen.findByLabelText('Message');
+  await waitFor(() => expect(input).toBeEnabled());
+  await userEvent.setup().type(input, 'Fictional atomic navigation handoff');
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Send' }));
+  mounted.unmount();
+  await act(async () => {
+    release();
+  });
+  const restored = await work.read(
+    work.lease({
+      userId: 'demo-sage',
+      workspaceId: 'demo-orbit',
+      incidentId: 'fictional-incident-2841',
+    }),
+  );
+  expect(restored.draft).toBe('');
+  expect(restored.records).toHaveLength(1);
+  expect(restored.records[0]?.body).toBe('Fictional atomic navigation handoff');
 });
