@@ -7,6 +7,8 @@ import { IndexedDbIncidentStore } from '@/features/incident-management/indexeddb
 import { incidentHandlers } from '@/features/incident-management/handlers';
 import { MockTimelineAuthority, makeTimelineAuthorityStore } from '@/features/timeline/authority';
 import { timelineHandlers } from '@/features/timeline/handlers';
+import { EventJournal, makeJournalStore } from '@/features/realtime/journal';
+import { composeRealtimeAuthority } from './realtime-authority';
 
 let startup: Promise<void> | null = null;
 export function startMock() {
@@ -14,6 +16,7 @@ export function startMock() {
     const auth = new MockAuthAuthority(new IndexedDbAuthorityStore());
     const incidents = new MockIncidentAuthority(new IndexedDbIncidentStore());
     const timeline = new MockTimelineAuthority(makeTimelineAuthorityStore());
+    const journal = new EventJournal(makeJournalStore());
     const worker = setupWorker(
       ...authHandlers(auth),
       ...incidentHandlers(
@@ -35,6 +38,11 @@ export function startMock() {
         (actor, number) => incidents.detail(actor, number),
         (actor, number, time) => incidents.recordActivity(actor, number, time),
       ),
+      ...composeRealtimeAuthority(journal, incidents, timeline, async (client) => {
+        const session = await auth.current(client);
+        if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
+        return session.user;
+      }),
     );
     startup = worker
       .start({

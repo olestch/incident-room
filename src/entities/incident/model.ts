@@ -45,6 +45,7 @@ export type CreateIncidentInput = z.infer<typeof createIncidentSchema>;
 export const incidentSchema = createIncidentSchema
   .extend({
     id: z.string().min(1),
+    revision: z.number().int().positive().default(1),
     workspaceId: z.string().min(1),
     number: z.string().regex(/^INC-\d{4,}$/),
     status: z.enum(statuses),

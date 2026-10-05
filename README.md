@@ -2,7 +2,7 @@
 
 Incident Room is a public portfolio project for coordinating technical incidents. Dedicated incident rooms will combine operational context, a realtime timeline, contextual discussions, and postmortem documentation using fictional, deterministic data.
 
-**Current status:** Phase 4 Incident Room & Timeline Foundation implemented. Incident management and identity-safe authentication now include a measured virtual Timeline, older history, deep links, plain-text compose, durable drafts/outbox and idempotent delivery reconciliation. WebSocket business streaming, Threads and full Demo Mode are not implemented.
+**Current status:** Phase 5 Realtime Synchronization implemented. The existing virtual Timeline, history/deep links and durable draft/outbox now receive realtime confirmations through the same reconciliation path. Independent clients recover missed changes through a persistent journal, checkpoints and authoritative resync. Connection state, presence, typing and old-reader New updates are available. Threads, production WebSocket infrastructure and visible Demo Mode remain unimplemented.
 
 The accepted [Product Specification](docs/product-spec.md) defines product behavior. [Technical Architecture](docs/technical-architecture.md) defines ownership, runtime boundaries, persistence, realtime, and testing decisions. The accepted Phase 0 document is preserved unchanged, including its historical implementation-status marker.
 
@@ -40,6 +40,14 @@ Native IndexedDB stores identity/incident-scoped drafts and outbox separately fr
 
 Other future-feature destinations remain placeholders. Authentication preserves safe `/app/` return paths including query/hash; external/malformed returns fall back to `/app/incidents`. A full navigation crosses the auth boundary intentionally; in-app navigation uses Next.js.
 
+## Realtime simulation
+
+Open two tabs in the same browser profile/origin and the same incident. Each tab owns an independent authenticated transport and checkpoint; a confirmed message appears in the other without refreshing. The deterministic mock adapter polls a shared fictional-server IndexedDB journal every 500ms; it implements WebSocket-style lifecycle behind a replaceable port, not an actual network WebSocket or production server. Separate browser profiles/contexts have separate fictional-server storage and do not share a backend.
+
+Transport connection does not imply synchronization: Connecting/Reconnecting remains visible until authoritative recovery completes. Browser offline is a hint; old confirmed content and durable local work remain readable. Online recovery fetches missed persistent changes, buffers live events, merges revisions and only then reports Connected. Expired checkpoints refresh bounded recent/loaded-entry snapshots without clearing draft/outbox or reloading the app. Retry connection is explicit; mutation retries remain user-driven.
+
+Room presence and rate-limited typing use a separate Service Worker's **in-memory fictional-server** lease registry, never persistent storage or Timeline events. Departure/disconnect removes the lease; abandoned leases expire and worker restart rebuilds from active heartbeats. This is no cross-tab socket sharing, leader election or direct client messaging. Each client reads server snapshots; no BroadcastChannel/SharedWorker is used. The list watches workspace metadata without joining incident presence. New updates counts distinct newly confirmed entries while reading older history, preserving the anchor and active deep link until explicitly returning to latest.
+
 ## Validation
 
 ```sh
@@ -60,6 +68,6 @@ React 19, Next.js, TypeScript, Redux Toolkit, TanStack Query, React Hook Form, Z
 
 React/Next.js, Redux, Query, Tailwind, RHF/Zod forms, MSW auth/incident/Timeline authorities, TanStack Virtual, native IndexedDB, Vitest/Testing Library, Playwright and CI are configured. Confirmed resources belong to Query; Redux stores serializable session/connection and local mutation coordination metadata, never confirmed Timeline content. Central semantic policy governs both UI and authority. Session lifecycle now stops local work and integrates durable logout cleanup with the existing retry barrier. The creation surface uses native HTML dialog; no Radix/shadcn package is installed.
 
-HTTP/session integration tests inject authority/clock to trigger expiry deterministically. Browser suites additionally exercise anchor preservation (8px tolerance), optimistic confirmation, rejected Retry, ambiguity after persistence, restored outbox/draft, old target/tombstone, in-flight target supersession, identity cleanup and responsive compose. A real 10,000-row projection has a bounded DOM in component tests; the browser also checks a 10,000-entry authority dataset. The generator supports 50,000 without loading that size by default. Fault/latency injection edits internal test-fixture IndexedDB records only: no test endpoint, product control or window global. No fragile FPS/wall-clock assertions. Each browser test has independent storage.
+HTTP/session integration tests inject authority/clock to trigger expiry deterministically. Realtime tests cover validation, checkpoint commits, duplicates/revisions/tombstones, cancellation/deadlines, backoff, buffering and journal retention. Browser suites exercise multi-client live delivery, reconnect/resync, dropped/duplicate/reversed delivery, optimistic echo before HTTP, expired snapshots, presence/typing, metadata convergence and target/old-reader preservation alongside earlier auth/Timeline regressions. A real 10,000-row projection has a bounded DOM in component tests; the browser also checks a 10,000-entry authority dataset. The generator supports 50,000 without loading that size by default. Fault/latency injection edits internal test-fixture IndexedDB records only: no test endpoint, product control or window global. No fragile FPS benchmarks. Tests isolate storage; multi-client cases deliberately share one fictional server through independent pages in one browser context.
 
 This is an independent clean-room project. No private commercial source or real incident data is used.

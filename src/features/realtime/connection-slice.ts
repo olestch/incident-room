@@ -6,7 +6,7 @@ interface ConnectionState {
   status: ConnectionStatus;
 }
 
-// No transport starts in Phase 1. Services will publish serializable lifecycle facts here.
+// Room services publish serializable lifecycle facts; runtime instances stay outside Redux.
 const initialState: ConnectionState = { status: 'offline' };
 
 const connectionSlice = createSlice({

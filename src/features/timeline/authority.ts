@@ -17,6 +17,14 @@ export const authorityDataSchema = z.object({
   fault: z.enum(['none', 'reject-once', 'ambiguous-once', 'missing-once']).default('none'),
   responseDelayMs: z.number().int().min(0).max(5000).default(0),
   locateDelayMs: z.number().int().min(0).max(5000).default(0),
+  changes: z
+    .array(
+      z.object({
+        kind: z.enum(['timeline_created', 'timeline_updated', 'timeline_tombstoned']),
+        entry: timelineEntrySchema,
+      }),
+    )
+    .default([]),
 });
 export type AuthorityData = z.infer<typeof authorityDataSchema>;
 export function seedTimeline(key: string): AuthorityData {
@@ -30,6 +38,7 @@ export function seedTimeline(key: string): AuthorityData {
     fault: 'none',
     responseDelayMs: 0,
     locateDelayMs: 0,
+    changes: [],
   };
 }
 export const makeTimelineAuthorityStore = () =>
@@ -162,6 +171,7 @@ export class MockTimelineAuthority {
         originatingClientMutationId: input.clientMutationId,
       });
       data.entries.push(entry);
+      data.changes.push({ kind: 'timeline_created', entry: structuredClone(entry) });
       data.receipts[key] = { id: entry.id, body: input.body };
       return { entry, ambiguous: fault === 'ambiguous-once', delay: data.responseDelayMs };
     });
@@ -175,5 +185,44 @@ export class MockTimelineAuthority {
         422,
       );
     return result.entry;
+  }
+  changes(actor: IncidentActor, incident: Incident) {
+    return this.store.transact(this.room(actor, incident), (data) => data.changes);
+  }
+  acknowledgeChanges(actor: IncidentActor, incident: Incident, ids: string[]) {
+    const confirmed = new Set(ids);
+    return this.store.transact(this.room(actor, incident), (data) => {
+      data.changes = data.changes.filter(
+        (change) => !confirmed.has(`${change.entry.id}:${change.entry.revision}`),
+      );
+    });
+  }
+  snapshot(actor: IncidentActor, incident: Incident, ids: string[]) {
+    if (ids.length > 60) throw new AppError('validation', 'Snapshot window too large.', 400);
+    return this.store.transact(this.room(actor, incident), (data) => ({
+      items: data.entries.filter((entry) => ids.includes(entry.id)),
+      olderCursor: null,
+      newerCursor: null,
+      total: data.entries.length,
+    }));
+  }
+  /** Internal authority correction/tombstone fixture; confirmed messages have no edit UI. */
+  simulate(actor: IncidentActor, incident: Incident, raw: unknown) {
+    const entry = timelineEntrySchema.parse(raw);
+    if (entry.incidentId !== incident.id) throw new AppError('validation', 'Invalid room.', 400);
+    return this.store.transact(this.room(actor, incident), (data) => {
+      const index = data.entries.findIndex((value) => value.id === entry.id);
+      if (index >= 0 && data.entries[index]!.revision >= entry.revision) return;
+      if (index < 0) data.entries.push(entry);
+      else data.entries[index] = entry;
+      data.changes.push({
+        kind: entry.tombstone
+          ? 'timeline_tombstoned'
+          : index < 0
+            ? 'timeline_created'
+            : 'timeline_updated',
+        entry,
+      });
+    });
   }
 }

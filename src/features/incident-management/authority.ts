@@ -20,6 +20,19 @@ export const incidentAuthoritySchema = z.object({
   incidents: z.array(incidentSchema),
   nextNumber: z.number().int().positive(),
   receipts: z.record(z.string(), z.object({ number: z.string(), fingerprint: z.string() })),
+  changes: z
+    .array(
+      z.object({
+        kind: z.enum([
+          'incident_created',
+          'incident_updated',
+          'status_changed',
+          'severity_changed',
+        ]),
+        incident: incidentSchema,
+      }),
+    )
+    .default([]),
 });
 export type IncidentAuthorityData = z.infer<typeof incidentAuthoritySchema>;
 export interface IncidentStore {
@@ -39,6 +52,7 @@ export function seedIncidents(): IncidentAuthorityData {
   return {
     nextNumber: 2873,
     receipts: {},
+    changes: [],
     incidents: Array.from({ length: 32 }, (_, index): Incident => {
       const createdAt = new Date(Date.UTC(2026, 8, 1 + index, 9)).toISOString();
       const updatedAt = new Date(Date.parse(createdAt) + ((index % 6) + 1) * 3600000).toISOString();
@@ -130,7 +144,11 @@ export class MockIncidentAuthority {
       const incident = data.incidents.find((record) => record.number === number);
       if (!incident || !canViewIncident(actor, incident))
         throw new AppError('authorization', 'Access denied.', 403);
-      if (time > incident.updatedAt) incident.updatedAt = time;
+      if (time > incident.updatedAt) {
+        incident.updatedAt = time;
+        incident.revision++;
+        data.changes.push({ kind: 'incident_updated', incident: structuredClone(incident) });
+      }
     });
   }
   async create(actor: IncidentActor, raw: unknown, users: WorkspaceUser[], requestId: string) {
@@ -174,8 +192,54 @@ export class MockIncidentAuthority {
         resolvedAt: null,
       });
       data.incidents.push(incident);
+      data.changes.push({ kind: 'incident_created', incident: structuredClone(incident) });
       data.receipts[key] = { number, fingerprint };
       return incident;
+    });
+  }
+  changes(actor: IncidentActor) {
+    return this.store.transact((data) =>
+      data.changes.filter((change) => canViewIncident(actor, change.incident)),
+    );
+  }
+  acknowledgeChanges(actor: IncidentActor, ids: string[]) {
+    const confirmed = new Set(ids);
+    return this.store.transact((data) => {
+      data.changes = data.changes.filter(
+        (change) =>
+          change.incident.workspaceId !== actor.workspaceId ||
+          !confirmed.has(`${change.incident.id}:${change.incident.revision}`),
+      );
+    });
+  }
+  /** Internal fictional-server simulation, no product mutation UI or HTTP control. */
+  async simulate(
+    actor: IncidentActor,
+    number: string,
+    patch: Partial<Pick<Incident, 'status' | 'severity' | 'participantIds'>>,
+  ) {
+    return this.store.transact((data) => {
+      const previous = data.incidents.find((i) => i.number === number);
+      if (!previous || !canViewIncident(actor, previous))
+        throw new AppError('authorization', 'Access denied.', 403);
+      const time = new Date(this.now()).toISOString();
+      const next = incidentSchema.parse({
+        ...previous,
+        ...patch,
+        revision: previous.revision + 1,
+        updatedAt: time,
+        resolvedAt: patch.status === 'resolved' ? time : previous.resolvedAt,
+      });
+      data.incidents[data.incidents.indexOf(previous)] = next;
+      data.changes.push({
+        kind: patch.status
+          ? 'status_changed'
+          : patch.severity
+            ? 'severity_changed'
+            : 'incident_updated',
+        incident: structuredClone(next),
+      });
+      return next;
     });
   }
 }

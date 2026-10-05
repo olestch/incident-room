@@ -187,9 +187,23 @@ export const TimelineList = forwardRef<
     remove(id: string): void;
     loadGap(cursor: string): void;
     writable: boolean;
+    newEntryIds?: string[];
+    goLatest?(): void;
   }
 >(function TimelineList(
-  { rows, users, highlight, targetActive, retry, check, remove, loadGap, writable },
+  {
+    rows,
+    users,
+    highlight,
+    targetActive,
+    retry,
+    check,
+    remove,
+    loadGap,
+    writable,
+    newEntryIds = [],
+    goLatest,
+  },
   ref,
 ) {
   'use no memo'; // TanStack Virtual exposes mutable imperative methods; keep this measured boundary outside React Compiler.
@@ -205,6 +219,15 @@ export const TimelineList = forwardRef<
   const initialized = useRef(false);
   const widthAnchor = useRef<{ key: string; offset: number } | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
+  const counted = useRef(new Set<string>());
+  const nearEnd = useRef(true);
+  const [updates, setUpdates] = useState<string[]>([]);
+  useEffect(() => {
+    const fresh = newEntryIds.filter((id) => !counted.current.has(id));
+    for (const id of fresh) counted.current.add(id);
+    if (fresh.length && (!nearEnd.current || targetActive))
+      setUpdates((previous) => [...previous, ...fresh]);
+  }, [newEntryIds, targetActive]);
   const indexes = useMemo(() => new Map(rows.map((row, index) => [row.key, index])), [rows]);
   const targetIndexes = useMemo(
     () =>
@@ -326,79 +349,100 @@ export const TimelineList = forwardRef<
     [],
   );
   return (
-    <div
-      ref={container}
-      className="timeline-viewport"
-      tabIndex={0}
-      aria-label="Timeline viewport"
-      onScroll={settle}
-      onFocusCapture={(event) => {
-        const item = (event.target as HTMLElement).closest<HTMLElement>('[data-row-key]');
-        if (item) setFocused(item.dataset.rowKey ?? null);
-      }}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(null);
-      }}
-    >
-      <ol
-        aria-label="Timeline entries"
-        style={{ height: virtual.getTotalSize(), position: 'relative', margin: 0, padding: 0 }}
+    <>
+      {updates.length > 0 && (
+        <button
+          className="incident-button my-2"
+          onClick={() => {
+            goLatest?.();
+            virtual.scrollToEnd({ behavior: 'auto' });
+            nearEnd.current = true;
+            setUpdates([]);
+          }}
+        >
+          New updates ({updates.length})
+        </button>
+      )}
+      <div
+        ref={container}
+        className="timeline-viewport"
+        tabIndex={0}
+        aria-label="Timeline viewport"
+        onScroll={() => {
+          settle();
+          const node = container.current;
+          nearEnd.current = !!node && node.scrollHeight - node.clientHeight - node.scrollTop <= 96;
+          if (nearEnd.current && !targetActive)
+            setUpdates((previous) => (previous.length ? [] : previous));
+        }}
+        onFocusCapture={(event) => {
+          const item = (event.target as HTMLElement).closest<HTMLElement>('[data-row-key]');
+          if (item) setFocused(item.dataset.rowKey ?? null);
+        }}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setFocused(null);
+        }}
       >
-        {virtual.getVirtualItems().map((item) => {
-          const row = rows[item.index]!;
-          return (
-            <li
-              key={row.key}
-              data-row-key={row.key}
-              data-entry-id={row.entry?.id}
-              data-index={item.index}
-              aria-posinset={item.index + 1}
-              aria-setsize={rows.length}
-              ref={(node) => {
-                virtual.measureElement(node);
-                if (row.entry) {
-                  if (node) mounted.current.set(row.entry.id, node);
-                  else mounted.current.delete(row.entry.id);
-                }
-                if (node) queueMicrotask(settle);
-              }}
-              className={`timeline-row ${highlight && row.entry?.id === highlight ? 'timeline-target' : ''}`}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${item.start}px)`,
-              }}
-            >
-              {highlight && row.entry?.id === highlight && (
-                <p className="font-semibold">Navigation target</p>
-              )}
-              {row.entry ? (
-                <EntryContent entry={row.entry} users={users} />
-              ) : row.local ? (
-                <LocalEntry
-                  record={row.local}
-                  retry={retry}
-                  check={check}
-                  remove={remove}
-                  writable={writable}
-                />
-              ) : (
-                'gap' in row && (
-                  <div>
-                    <p>Unloaded Timeline history between windows</p>
-                    <button className="incident-button" onClick={() => loadGap(row.gap.cursor)}>
-                      Load this history gap
-                    </button>
-                  </div>
-                )
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+        <ol
+          aria-label="Timeline entries"
+          style={{ height: virtual.getTotalSize(), position: 'relative', margin: 0, padding: 0 }}
+        >
+          {virtual.getVirtualItems().map((item) => {
+            const row = rows[item.index]!;
+            return (
+              <li
+                key={row.key}
+                data-row-key={row.key}
+                data-entry-id={row.entry?.id}
+                data-index={item.index}
+                aria-posinset={item.index + 1}
+                aria-setsize={rows.length}
+                ref={(node) => {
+                  virtual.measureElement(node);
+                  if (row.entry) {
+                    if (node) mounted.current.set(row.entry.id, node);
+                    else mounted.current.delete(row.entry.id);
+                  }
+                  if (node) queueMicrotask(settle);
+                }}
+                className={`timeline-row ${highlight && row.entry?.id === highlight ? 'timeline-target' : ''}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${item.start}px)`,
+                }}
+              >
+                {highlight && row.entry?.id === highlight && (
+                  <p className="font-semibold">Navigation target</p>
+                )}
+                {row.entry ? (
+                  <EntryContent entry={row.entry} users={users} />
+                ) : row.local ? (
+                  <LocalEntry
+                    record={row.local}
+                    retry={retry}
+                    check={check}
+                    remove={remove}
+                    writable={writable}
+                  />
+                ) : (
+                  'gap' in row && (
+                    <div>
+                      <p>Unloaded Timeline history between windows</p>
+                      <button className="incident-button" onClick={() => loadGap(row.gap.cursor)}>
+                        Load this history gap
+                      </button>
+                    </div>
+                  )
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </>
   );
 });
 

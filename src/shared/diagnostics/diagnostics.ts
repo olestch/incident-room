@@ -4,7 +4,17 @@ export type DiagnosticEvent =
   | 'duplicate-ignored'
   | 'mutation-outcome-unknown'
   | 'invalid-boundary-data'
-  | 'render-recovery';
+  | 'render-recovery'
+  | 'transport_connected'
+  | 'transport_disconnected'
+  | 'reconnect_attempt'
+  | 'resync_started'
+  | 'resync_completed'
+  | 'duplicate_event'
+  | 'stale_revision'
+  | 'invalid_event'
+  | 'checkpoint_advanced';
+// Realtime categories contain no content or identity fields.
 
 export interface DiagnosticRecord {
   event: DiagnosticEvent;

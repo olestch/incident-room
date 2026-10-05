@@ -36,6 +36,7 @@ import {
 import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { AppError } from '@/shared/errors/app-error';
 import { TimelineRoom } from './timeline-room';
+import { useListRealtime } from './use-list-realtime';
 
 export function IncidentPage({ number }: { number?: string }) {
   const { state } = useSessionRuntime();
@@ -137,17 +138,25 @@ function IdentityIncidentPage({
     queryKey: incidentKeys.detail(userId, workspaceId, number ?? ''),
     enabled: !!number,
     queryFn: ({ signal }) =>
-      coordinator.request(
-        (s) =>
-          adapter.resource(
-            `/incidents/${encodeURIComponent(number!)}`,
-            incidentSchema.refine((incident) => incident.workspaceId === workspaceId),
-            s,
-          ),
-        'safe-read',
-        signal,
-      ),
+      coordinator
+        .request(
+          (s) =>
+            adapter.resource(
+              `/incidents/${encodeURIComponent(number!)}`,
+              incidentSchema.refine((incident) => incident.workspaceId === workspaceId),
+              s,
+            ),
+          'safe-read',
+          signal,
+        )
+        .then((incident) => {
+          const previous = cache.getQueryData<z.infer<typeof incidentSchema>>(
+            incidentKeys.detail(userId, workspaceId, number!),
+          );
+          return previous && previous.revision > incident.revision ? previous : incident;
+        }),
   });
+  useListRealtime(!number && !!current.data && !!list.data, userId, workspaceId);
   const mutation = useMutation({
     retry: false,
     mutationFn: ({ input, requestId }: { input: CreateIncidentInput; requestId: string }) =>

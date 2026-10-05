@@ -13,6 +13,7 @@ import type { IncidentActor } from './policy';
 
 const incident: Incident = {
   id: 'one',
+  revision: 1,
   workspaceId: 'orbit',
   number: 'INC-2841',
   title: 'Fictional outage',

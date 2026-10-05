@@ -31,6 +31,8 @@ import { localWorkChanged } from '@/features/timeline/coordination-slice';
 import { AppError } from '@/shared/errors/app-error';
 import { useAppDispatch } from '@/app/_providers/hooks';
 import { useLocalWork, useSessionRuntime } from '@/app/_providers/session-provider';
+import { useRoomRealtime } from './use-room-realtime';
+import { RealtimeSummary } from '@/features/realtime/views';
 
 export function TimelineRoom({
   incident,
@@ -150,6 +152,7 @@ export function TimelineRoom({
       ),
     getNextPageParam: (page) => page.olderCursor,
   });
+  const realtime = useRoomRealtime(incident, actor, delivery);
   const acknowledgments = useQuery({
     queryKey: ackKey,
     queryFn: () => Promise.resolve([] as TimelineEntry[]),
@@ -179,12 +182,13 @@ export function TimelineRoom({
   );
   useEffect(() => {
     const ids = new Set(records.map((record) => record.clientMutationId));
-    for (const window of windows)
+    for (const window of [...windows, { items: acknowledgments.data }])
       for (const entry of window.items)
         if (
           entry.type === 'human_message' &&
           entry.originatingClientMutationId &&
-          ids.has(entry.originatingClientMutationId)
+          ids.has(entry.originatingClientMutationId) &&
+          entry.authorId === actor.id
         )
           void delivery
             .acknowledge(entry)
@@ -193,7 +197,7 @@ export function TimelineRoom({
                 'Confirmation is visible, but local cleanup could not complete. Check browser storage.',
               ),
             );
-  }, [windows, records, delivery]);
+  }, [windows, records, delivery, acknowledgments.data, actor.id]);
   const flush = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -304,6 +308,7 @@ export function TimelineRoom({
     return () => clearTimeout(timeout);
   }, [highlight]);
   const edit = (value: string) => {
+    realtime.typing(value.trim().length > 0);
     latestBody.current = value;
     dirty.current = true;
     setBody(value);
@@ -323,30 +328,35 @@ export function TimelineRoom({
     history.error instanceof AppError &&
     ['authentication', 'authorization', 'not-found'].includes(history.error.category);
   const writable = !denied && canWriteIncident(actor, incident);
+  const goLatest = () => {
+    navigation.cancel();
+    const query = new URLSearchParams(params.toString());
+    query.delete('event');
+    router.replace(
+      `${window.location.pathname}${query.size ? `?${query}` : ''}${window.location.hash}`,
+      { scroll: false },
+    );
+    setNavigationStatus('Showing latest Timeline entries.');
+    setHighlight(null);
+    viewport.current?.latest();
+  };
   return (
     <section aria-labelledby="timeline-heading" className="min-w-0">
       <div className="flex flex-wrap justify-between gap-2 my-3">
         <h2 id="timeline-heading" className="text-xl font-semibold">
           Timeline
         </h2>
-        <button
-          className="incident-button"
-          onClick={() => {
-            navigation.cancel();
-            const query = new URLSearchParams(params.toString());
-            query.delete('event');
-            router.replace(
-              `${window.location.pathname}${query.size ? `?${query}` : ''}${window.location.hash}`,
-              { scroll: false },
-            );
-            setNavigationStatus('Showing latest Timeline entries.');
-            setHighlight(null);
-            viewport.current?.latest();
-          }}
-        >
+        <button className="incident-button" onClick={goLatest}>
           Go to latest
         </button>
       </div>
+      <RealtimeSummary
+        status={realtime.status}
+        members={realtime.members}
+        users={users}
+        userId={actor.id}
+        retry={realtime.retry}
+      />
       {navigationStatus && <p role="status">{navigationStatus}</p>}
       {target !== null && !highlight && !navigationStatus.startsWith('Locating') && (
         <button
@@ -399,6 +409,8 @@ export function TimelineRoom({
         users={users}
         highlight={highlight}
         targetActive={target !== null}
+        newEntryIds={realtime.arrivals}
+        goLatest={goLatest}
         writable={writable}
         retry={(id) => act(delivery.retry(id))}
         check={(id) => act(delivery.check(id))}
@@ -434,6 +446,7 @@ export function TimelineRoom({
         send={() => {
           if (preparing.current || busy || !writable) return;
           preparing.current = true;
+          realtime.typing(false);
           setBusy(true);
           setIssue(null);
           if (timer.current) clearTimeout(timer.current);

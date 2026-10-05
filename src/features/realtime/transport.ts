@@ -1,12 +1,15 @@
 export type TransportEvent =
-  { type: 'payload'; payload: unknown } | { type: 'closed'; code: number } | { type: 'error' };
+  | { type: 'payload'; payload: unknown }
+  | { type: 'closed'; code: number }
+  | { type: 'error' }
+  | { type: 'watermark'; sequence: number };
 
-/** Runtime port shared by future native and deterministic mock transport adapters. */
+/** Semantic lifecycle port implemented by the mock; replaceable by native WebSocket. */
 export interface RealtimeTransport {
   connect(signal: AbortSignal): Promise<void>;
   disconnect(): void;
   subscribe(listener: (event: TransportEvent) => void): () => void;
+  typing?(active: boolean): void;
 }
 
-// Protocol validation, auth, subscriptions, and resync belong above this port.
-// No socket implementation or domain payload schema exists in Phase 1.
+// Validation/checkpoints/resync belong to the coordinator, never raw component callbacks.

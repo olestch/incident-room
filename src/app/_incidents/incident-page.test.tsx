@@ -32,6 +32,9 @@ import {
 import { incidentHandlers } from '@/features/incident-management/handlers';
 import { useSessionRuntime, useLocalWork } from '@/app/_providers/session-provider';
 import { IncidentPage } from './incident-page';
+import { EventJournal, seedJournal } from '@/features/realtime/journal';
+import { composeRealtimeAuthority } from '@/app/_mocks/realtime-authority';
+vi.mock('@/features/realtime/ephemeral-broker', () => ({ ephemeralRequest: async () => [] }));
 
 const navigation = vi.hoisted(() => ({
   search: '',
@@ -78,9 +81,20 @@ beforeEach(async () => {
   });
   auth = new MockAuthAuthority(new MemoryAuthorityStore());
   authority = new MockIncidentAuthority(new MemoryIncidentStore());
+  const timeline = new MockTimelineAuthority(new MemoryAtomicStore(seedTimeline));
   server.use(
+    ...composeRealtimeAuthority(
+      new EventJournal(new MemoryAtomicStore(seedJournal)),
+      authority,
+      timeline,
+      async (id) => {
+        const session = await auth.current(id);
+        if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
+        return session.user;
+      },
+    ),
     ...timelineHandlers(
-      new MockTimelineAuthority(new MemoryAtomicStore(seedTimeline)),
+      timeline,
       async (id) => {
         const session = await auth.current(id);
         if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);

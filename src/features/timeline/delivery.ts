@@ -17,6 +17,7 @@ export class DeliveryCoordinator {
   private records = new Map<string, OutboxRecord>();
   private controller = new AbortController();
   private inFlight = new Map<string, Promise<void>>();
+  private confirmedMutations = new Set<string>();
   constructor(
     private readonly storage: LocalWorkService,
     private readonly lease: LocalLease,
@@ -54,7 +55,7 @@ export class DeliveryCoordinator {
     const task = operation()
       .catch((error: unknown) => {
         const record = this.records.get(id);
-        if (record && this.active()) {
+        if (record && this.active() && !this.confirmedMutations.has(id)) {
           this.records.set(id, {
             ...record,
             state: 'unknown',
@@ -73,9 +74,9 @@ export class DeliveryCoordinator {
     return task;
   }
   private async save(record: OutboxRecord) {
-    if (!this.active()) return;
+    if (!this.active() || this.confirmedMutations.has(record.clientMutationId)) return;
     await this.storage.update(this.lease, record);
-    if (!this.active()) return;
+    if (!this.active() || this.confirmedMutations.has(record.clientMutationId)) return;
     this.records.set(record.clientMutationId, record);
     this.emit();
   }
@@ -89,9 +90,10 @@ export class DeliveryCoordinator {
     )
       throw new AppError('validation', 'Invalid mutation confirmation.');
     const record = this.records.get(id);
-    if (record && !entry.tombstone && entry.body !== record.body)
+    if (record && entry.revision === 1 && !entry.tombstone && entry.body !== record.body)
       throw new AppError('validation', 'Confirmation content does not match this mutation.');
     this.port.confirmed(entry); // Query association happens synchronously BEFORE durable/local removal.
+    this.confirmedMutations.add(id);
     await this.storage.remove(this.lease, id);
     if (!this.active()) return;
     this.records.delete(id);
@@ -100,6 +102,7 @@ export class DeliveryCoordinator {
   async acknowledge(entry: TimelineEntry) {
     if (
       entry.type === 'human_message' &&
+      entry.authorId === this.lease.scope.userId &&
       entry.originatingClientMutationId &&
       this.records.has(entry.originatingClientMutationId)
     )
@@ -165,7 +168,7 @@ export class DeliveryCoordinator {
       const entry = await this.port.create(sending, this.controller.signal);
       await this.associate(id, entry);
     } catch (error) {
-      if (!this.active()) return;
+      if (!this.active() || this.confirmedMutations.has(id)) return;
       if (
         error instanceof AppError &&
         ['validation', 'authorization', 'conflict'].includes(error.category) &&
