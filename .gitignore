@@ -33,6 +33,8 @@ blob-report/
 .cache/
 .turbo/
 *.tsbuildinfo
+next-env.d.ts
+.pnpm-store/
 
 # Editor and OS artifacts
 .idea/
