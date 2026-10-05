@@ -49,6 +49,7 @@ export default defineConfig([
     'playwright-report/**',
     'test-results/**',
     'next-env.d.ts',
+    'public/mockServiceWorker.js',
   ]),
   {
     files: ['**/*.{ts,tsx}'],

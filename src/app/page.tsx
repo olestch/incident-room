@@ -1,3 +1,4 @@
+import Link from 'next/link';
 export default function HomePage() {
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
@@ -16,9 +17,13 @@ export default function HomePage() {
           Implementation in progress
         </h2>
         <p className="mt-3 leading-relaxed text-muted">
-          The technical foundation is in place. Incident workflows will arrive in subsequent phases.
+          Authentication and session lifecycle are available. Incident workflows will arrive in
+          subsequent phases.
         </p>
       </section>
+      <Link href="/login" className="mt-6 inline-block rounded-lg bg-ink px-5 py-3 text-white">
+        Sign in to the fictional workspace
+      </Link>
     </main>
   );
 }

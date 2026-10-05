@@ -1,14 +1,15 @@
 # Incident Room — Technical Architecture
 
-**Status:** Phase 1 foundation  
+**Status:** Phase 2 authentication lifecycle
+
 **Product authority:** [Accepted Phase 0 specification](product-spec.md)  
-**Implementation scope:** Tooling, infrastructure boundaries, providers, and minimal shell only
+**Implementation scope:** Foundation plus mocked authentication, session lifecycle, protected routing and identity-safe shell; no Incident business functionality
 
 The accepted product specification remains an immutable Phase 0 snapshot. Its historical “Not started” marker is preserved; current implementation progress is tracked here and in README. This document introduces no new product behavior.
 
 ## 1. Architecture goals
 
-Support one coherent incident-coordination product with reliable identity isolation, paginated realtime history, durable optimistic work, and accessible responsive navigation. Establish the foundation without implementing incidents, authentication screens, threads, or demo controls yet.
+Support one coherent incident-coordination product with reliable identity isolation, paginated realtime history, durable optimistic work, and accessible responsive navigation. Authentication is implemented in Phase 2; incidents, threads, outbox/drafts and demo controls remain future work.
 
 ## 2. Architectural principles
 
@@ -49,7 +50,7 @@ src/
   app/                         Next.js routes, global CSS, metadata, composition
     _providers/                application wiring and per-mount Redux store
   features/
-    session/                   session adapter contract; later auth workflows
+    session/                   auth forms, session coordinator/adapter, mock authority
     realtime/                  transport contract and connection coordination
   shared/
     errors/                    typed application error categories
@@ -57,7 +58,8 @@ src/
     query/                     QueryClient defaults and identity scope keys
     ui/                        reusable non-domain error recovery surface
     testing/                   test setup only; never in production imports
-tests/e2e/                     browser smoke and later user journeys
+  entities/current-user/       validated current-user server resource and query key
+tests/e2e/                     browser smoke and authentication journeys
 docs/                          product and technical source documents
 ```
 
@@ -73,19 +75,27 @@ TypeScript uses `strict: true` to reject implicit unsafe values and unchecked nu
 
 ## 8. Routing architecture
 
-Only `/` is implemented in Phase 1. Product routes remain the Phase 0 route map: public `/login`, `/register`, `/forgot-password`, and protected `/app/*` for incidents, postmortem, notifications, search, team, profile, settings. Later use route groups for public/protected layouts without changing URLs.
+Phase 2 implements `/login`, `/register`, `/forgot-password`, and the `/app/*` client session gate. `/app/incidents` and recognized deeper product destinations are explicit placeholders, not business pages. The root layout remains server-side; public forms and protected shell are narrow client boundaries with Suspense around URL hooks. Anonymous protected navigation preserves path/query/hash as `returnTo`; authenticated login/register are public-only and immediately resume a safe destination.
+
+Authentication-boundary return uses `window.location.replace` on the centralized validated destination, intentionally creating a fresh browser runtime; ordinary app/public links remain Next Link/router navigation. E2E exposed duplicated `#context#context` with Next 16.3.8 client-cache navigation; the full auth-boundary navigation preserves the exact validated hash without changing product behavior or patching framework internals. This is a concrete integration choice, not a rendering/state ownership redesign.
 
 URL owns list filters/sort and `event`, `thread`, `message` targets. Thread is the parent timeline-entry context in URL; internal thread ID is resolved from it. Cmd/Ctrl+K and Create Incident are feature use cases, not separate routes now. Return destinations accept safe internal `/app/` paths including query/hash, reject external/protocol-relative paths, and default to `/app/incidents`. No speculative proxy/middleware gate before auth exists.
 
 ## 9. Authentication/session architecture
 
-`features/session` owns an adapter contract for restore, login, register, refresh, and logout; implementation comes later. A session coordinator will expose restoring/authenticated/anonymous/expired states in Redux plus non-sensitive user/workspace identity. Profiles remain Query data. Credentials stay outside Redux in the runtime adapter.
+`features/session` owns `SessionAdapter`, `HttpSessionAdapter`, and `SessionCoordinator`. Redux exposes the discriminated lifecycle `restoring | anonymous | authenticated | refreshing | expired`, generation, and minimal user/workspace/role/expiry references. Display name/email/active profile belong only to identity-scoped current-user Query data. The validated session envelope seeds that cache before exposing authenticated state. Mismatched envelope identity/profile or a current-user response for a different identity is rejected before cache population.
 
-Mock auth uses an opaque fictional session handle and simulated expiry. It is not a security boundary: MSW is a browser mock. Do not persist passwords or bearer tokens. A future real adapter uses secure HttpOnly SameSite cookies and server-enforced checks; browser refresh and user flows do not change.
+Mock auth uses the public opaque `ir_fictional_client` SameSite cookie as a fictional authority correlation handle, passed in `x-fictional-client`; it is not a bearer/refresh token or a security boundary. Access lasts five minutes, refresh eligibility one day. The fictional authority stores account profiles, one-way fictional password verification digests and client leases atomically in its separate IndexedDB database. Submitted raw passwords exist only during form/request processing, are cleared after submission, and are never persisted or logged. Verification digests are mock-server records, never Redux/Query/client session credentials; SHA-256 here is deliberately not production password hashing. Never enter a real password in this portfolio. A future real adapter uses secure HttpOnly SameSite cookies and server-enforced checks.
 
-One refresh Promise per tab coordinates concurrent expired requests. Safe reads retry once after successful refresh. Mutation retry requires stable mutation identity/outcome lookup. Invalid refresh stops runtime subscriptions, aborts requests, clears visible identity-specific Query/Redux state, hides private UI, and redirects with a safe return target. Durable records remain quarantined for same-user reauthentication. Explicit logout additionally deletes that user's drafts/outbox; failure to clear storage is surfaced rather than silently switching identities. Every async continuation checks session generation to prevent late prior-user data from entering the new session.
+Browser initialization awaits MSW before restoration/requests. Worker/restore progress becomes a retryable UI error after 12 seconds; HTTP operations have a 12-second timeout. Normal anonymous restoration does not flash protected UI. Invalid refresh ends in the login expiration message, while storage/network/validation boot failures have explicit restoration Retry.
+
+One refresh Promise per tab coordinates concurrent expired requests; near-expiry reads proactively join it. A refresh revision also prevents a late pre-refresh 401 from launching a second refresh. Only declared safe reads retry once; arbitrary mutations are not replayed. Login/register/reset/logout call their direct adapter operations and cannot enter a generic refresh loop.
+
+Invalid refresh synchronously advances generation, hides private UI, aborts the scoped controller, cancels/removes identity Query data, and resets connection coordination before asynchronous lifecycle disposal. Late signal-ignoring results fail generation checks. Durable records will be quarantined on expiry/switch; no draft/outbox stores exist now. `registerLifecycle` supplies `stop(identity, reason)` and `clearDurableOnLogout(identity)` extension points. Explicit logout hides identity immediately, calls authority logout and identity-specific cleanup, and forgets the local correlation cookie even on HTTP failure. Cleanup failure is surfaced, blocks new authentication, and retains a retryable cleanup identity. The login page exposes explicit cleanup Retry. No automatic retry or invented durable records.
 
 Multi-tab: ordinary HTTP authorization checks, restore/refresh, and realtime disconnects eventually reflect invalidation. No BroadcastChannel, shared connection, cross-tab refresh lock, or outbox leader election. Persistent confirmed state converges through the mock server described in section 31.
+
+Each adapter captures its active fictional client handle. Logout and cleanup retries target that captured handle; cookie removal is conditional on the same handle still being current, so a stale tab cannot revoke/remove a newer client's session. Login/register explicitly acquire the current correlation handle. Profile responses are checked against the captured frontend identity before Query accepts them; the active shell revalidates current-user through ordinary Query focus/reconnect and a 60-second interval.
 
 ## 10. Authorization/permissions architecture
 
@@ -103,7 +113,7 @@ Foundation defaults: stale time 30 seconds; GC 5 minutes; one retry for transien
 
 ## 12. Redux/client-state ownership
 
-Only a minimal connection lifecycle slice exists now. Redux later owns non-sensitive session coordination, realtime status/sync phase, serializable outbox coordination metadata, demo settings, and genuinely cross-feature ephemeral state. Confirmed resources remain in Query; local dialogs/forms stay local; active target remains URL-owned.
+Session coordination and the minimal connection lifecycle slice exist now. Redux later owns realtime sync phase, serializable outbox coordination metadata, demo settings, and genuinely cross-feature ephemeral state. Confirmed resources/profile remain in Query; local dialogs/forms stay local; active target remains URL-owned. Session teardown clears old identity and resets connection status to offline; runtime objects remain outside the store.
 
 Store factory is invoked per provider mount and typed hooks expose dispatch/selectors to app integration. Features do not import app hooks/store: application composition passes semantic state/commands to their UI, and services accept injected lifecycle callbacks. Default immutability/serializability middleware stays enabled; DevTools enabled only outside production. No sockets, DOM nodes, timers, controllers, Promises, errors, QueryClient, or database handles in state. Services dispatch plain serializable lifecycle facts through application wiring.
 
@@ -221,11 +231,17 @@ Vitest with Vite React transform, jsdom, Testing Library, jest-dom, and user-eve
 
 Playwright uses Chromium desktop and narrow mobile projects against production `build` + `start`; verify public shell, skip-link focus, responsive no-overflow, and absence of browser errors. Later E2E adds auth return, outbox reload/unknown outcome, reconnect resync, target supersession, thread migration. Async Server Components are validated through browser E2E, not incorrectly executed in jsdom.
 
-Future HTTP tests use MSW node lifecycle with unhandled application requests failing tests; realtime tests inject port/clock; reconciliation tests enumerate races/revisions; IndexedDB tests cover reload, identity switch, and logout. Tests use fictional seeded data only.
+Phase 2 integration tests use real MSW node handlers and the injected in-memory authority/clock: single-flight refresh, late 401, proactive refresh, non-replayed mutation, terminal teardown, stale A → logout → B, cleanup failure/retry and malformed response. Form tests exercise semantic validation/focus/submission/error/recovery. Browser tests cover protected/deep return including exact query/hash, register/reload, logout/switch, generic recovery, valid/terminal expiry, public-only gates, unknown routes and 320px/tablet overflow/keyboard behavior in desktop/mobile projects. Expiry is forced through the injected authority API in unit tests and test-only IndexedDB lease fixtures in E2E; no visible control, test HTTP endpoint or window global exists.
+
+Future realtime tests inject port/clock; reconciliation tests enumerate races/revisions; draft/outbox IndexedDB tests come with those features. Tests use fictional seeded data only.
 
 ## 31. Mock backend architecture
 
-MSW handles HTTP; deterministic resource factories/service rules are separate from handlers and reusable in tests. No business handlers or giant fixtures yet. Plan a same-origin mock namespace, cursor/window/outcome/sync capabilities, validation, permission checks, revisions, idempotency journal, expiry, and postmortem compare-version conflicts. Exact endpoint paths/payloads are chosen alongside their first feature, not invented now.
+MSW handles HTTP; deterministic service rules are separate from handlers and reusable in tests. Phase 2 implements only `/mock-api/auth/{login,register,forgot-password,logout,session,refresh,me}`. `MockAuthAuthority` uses an `AuthorityStore` contract: in-memory for unit/integration tests, native IndexedDB transactions in the browser for reload and independent-tab convergence. Seed users River Vale and Sage Linden belong to fictional Orbit Workshop. There is no real backend, email delivery, OAuth or token-reset workflow. Recovery always returns the same success response for known/unknown accounts.
+
+The generated `public/mockServiceWorker.js` is an unchanged MSW 2.15.0 vendor asset, ignored by formatting/lint only; all application code remains checked. Browser MSW runs in the portfolio production build as well as development so `build/start` demonstrates auth. It suppresses request/body logging and surfaces unmatched auth-namespace requests; unrelated Next/static traffic is bypassed. Native fetch is resolved at call time with its correct global receiver, after interception initialization. No mock APIs are invoked from feature UI.
+
+Incident cursor/window/outcome/sync capabilities, revisions, idempotency and postmortem conflicts remain future work; no business handlers or giant fixtures exist.
 
 For multi-tab convergence the future mock authority uses IndexedDB transactions for confirmed mock resources/session/event journal, distinct from user-local draft/outbox stores. Each tab's MSW handlers read that authority; independent transport simulators poll journal with per-tab cursors and can intentionally miss/delay/duplicate delivery. This is ordinary simulated server/realtime synchronization, not direct tab messaging or shared client coordination. Tests can use an in-memory authority instead. Mock persistence must be clearly identified as fictional browser data, never a production backend/security claim.
 
@@ -289,7 +305,7 @@ No architecture-significant product decision is reopened. Later protocol/schema 
 
 ## 38. Explicit non-goals
 
-Phase 1 does not implement incident list/room, timeline, threads, auth UI/complete service, notifications/search/palette, postmortem, demo UI, persistent outbox, full mock handlers/simulator, production backend, or domain actions. It creates executable tooling/providers/error foundation and contracts only. No private repository reference, proprietary fixture, or copied implementation. No speculative feature slices/empty entity folders. Stop after this phase.
+Phase 1 established tooling/providers/error foundation and contracts only. Phase 2 adds authentication/session infrastructure and the protected shell, but still excludes incident list/room, timeline, threads, notifications/search/palette business behavior, postmortem, demo UI, persistent drafts/outbox, realtime simulator/business transport, production backend, OAuth and domain actions. No private repository reference, proprietary fixture, copied implementation or speculative empty modules. Stop after Phase 2; Phase 3 requires explicit approval.
 
 ## 39. Phase 1 acceptance criteria
 
