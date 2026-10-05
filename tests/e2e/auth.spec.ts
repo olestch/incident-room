@@ -52,9 +52,7 @@ test('protected redirect, login, reload, logout and identity switch stay isolate
   await signIn(page);
   await expect(page).toHaveURL('/app/incidents');
   await expect(page.getByLabel('Current user')).toContainText('River Vale');
-  await expect(
-    page.getByText('Incident functionality is not implemented yet.', { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Incidents', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel('Current user')).toContainText('River Vale');
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
@@ -64,7 +62,10 @@ test('protected redirect, login, reload, logout and identity switch stay isolate
   await expect(page).toHaveURL(/\/login\?/);
   await signIn(page, 'sage.linden@example.test');
   await expect(page.getByLabel('Current user')).toContainText('Sage Linden');
-  await expect(page.getByText('River Vale', { exact: false })).toHaveCount(0);
+  await expect(page.getByLabel('Current user')).not.toContainText('River Vale');
+  // Workspace incident commanders remain readable; only identity-owned profile changes.
+  await page.getByRole('link', { name: 'My Incidents', exact: true }).click();
+  await expect(page.getByLabel('Assigned to me')).toBeChecked();
   expect(browserErrors).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -82,7 +83,7 @@ test('preserves the exact deep query and hash through auth and public-page navig
   await page.getByRole('link', { name: 'Sign in', exact: true }).click();
   await signIn(page);
   await expect(page).toHaveURL(destination);
-  await expect(page.getByRole('heading', { name: 'Protected route placeholder' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /INC-2841/ })).toBeVisible();
 });
 test('unsafe external return falls back to the application', async ({ page }) => {
   await page.goto('/login?returnTo=https%3A%2F%2Fevil.example');

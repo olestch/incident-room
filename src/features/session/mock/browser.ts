@@ -1,32 +1,3 @@
-import { setupWorker } from 'msw/browser';
-import { AUTH_NAMESPACE } from '@/features/session/http-session-adapter';
-import { MockAuthAuthority } from './authority';
-import { IndexedDbAuthorityStore } from './indexeddb-authority';
-import { authHandlers } from './handlers';
-
-let startup: Promise<void> | null = null;
-export function startAuthMock() {
-  if (!startup) {
-    const worker = setupWorker(
-      ...authHandlers(new MockAuthAuthority(new IndexedDbAuthorityStore())),
-    );
-    startup = worker
-      .start({
-        quiet: true,
-        serviceWorker: { url: '/mockServiceWorker.js' },
-        onUnhandledRequest(request) {
-          if (new URL(request.url).pathname.startsWith(AUTH_NAMESPACE))
-            throw new Error('Unhandled mock authentication request'); // No credentials/body/URL logging.
-        },
-      })
-      .then(() => {})
-      .catch((error) => {
-        startup = null;
-        throw error;
-      });
-  }
-  return startup;
-}
 const cookieName = 'ir_fictional_client';
 /** Public correlation handle, NOT a bearer credential. Browser mock auth is not security. */
 export function fictionalClientId() {

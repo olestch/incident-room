@@ -50,10 +50,15 @@ export class HttpSessionAdapter implements SessionAdapter {
     schema: z.ZodType<T>,
     signal: AbortSignal,
     body?: unknown,
+    namespace = AUTH_NAMESPACE,
   ): Promise<T> {
+    const invalidResponse =
+      namespace === AUTH_NAMESPACE
+        ? 'Invalid authentication response.'
+        : 'Invalid incident service response.';
     let response: Response;
     try {
-      response = await this.request(`${this.origin}${AUTH_NAMESPACE}${path}`, {
+      response = await this.request(`${this.origin}${namespace}${path}`, {
         method: body === undefined ? 'GET' : 'POST',
         cache: 'no-store',
         headers: {
@@ -65,22 +70,38 @@ export class HttpSessionAdapter implements SessionAdapter {
       });
     } catch {
       if (signal.aborted) throw new DOMException('Request cancelled', 'AbortError');
-      throw new AppError('network', 'Unable to reach authentication. Try again.');
+      throw new AppError(
+        'network',
+        'Unable to reach the service. Retry this submission without changing its fields.',
+      );
     }
     let payload: unknown;
     try {
       payload = await response.json();
     } catch {
-      throw new AppError('validation', 'Invalid authentication response.');
+      throw new AppError('validation', invalidResponse);
     }
     if (!response.ok) {
       const result = errorSchema.safeParse(payload);
-      if (!result.success) throw new AppError('validation', 'Invalid authentication response.');
+      if (!result.success && namespace !== AUTH_NAMESPACE) {
+        const business = z
+          .object({
+            category: z.enum(['validation', 'authorization', 'not-found', 'conflict', 'network']),
+            message: z.string().max(300),
+          })
+          .safeParse(payload);
+        if (business.success)
+          throw new AppError(business.data.category, business.data.message, response.status);
+      }
+      if (!result.success) throw new AppError('validation', invalidResponse);
       throw new AuthHttpError(result.data.code, response.status);
     }
     const result = schema.safeParse(payload);
-    if (!result.success) throw new AppError('validation', 'Invalid authentication response.');
+    if (!result.success) throw new AppError('validation', invalidResponse);
     return result.data;
+  }
+  resource<T>(path: string, schema: z.ZodType<T>, signal: AbortSignal, body?: unknown) {
+    return this.call(path, schema, signal, body, '/mock-api');
   }
   async restore(signal: AbortSignal) {
     return this.call('/session', sessionEnvelopeSchema.nullable(), signal);

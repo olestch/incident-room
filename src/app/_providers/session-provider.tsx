@@ -44,8 +44,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           'Session initialization is taking too long. Check browser storage and connection, then retry.',
         );
     }, 12_000);
-    void import('@/features/session/mock/browser')
-      .then((module) => module.startAuthMock())
+    void import('@/app/_mocks/browser')
+      .then((module) => module.startMock())
       .then(async () => {
         if (active) {
           await runtime.coordinator.restore();

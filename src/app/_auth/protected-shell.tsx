@@ -14,7 +14,7 @@ import {
 
 const links = [
   ['Incidents', '/app/incidents'],
-  ['My Incidents', '/app/incidents?assigned=me'],
+  ['My Incidents', '/app/incidents?assignedToMe=true'],
   ['Notifications', '/app/notifications'],
   ['Search', '/app/search'],
   ['Team', '/app/team'],
@@ -51,6 +51,7 @@ function IdentityShell({ identity, children }: { identity: SessionIdentity; chil
   const pathname = usePathname();
   const router = useRouter();
   const [logoutState, setLogoutState] = useState<'idle' | 'pending'>('idle');
+  const search = useSearchParams();
   const current = useQuery({
     queryKey: currentUserKey(identity.userId, identity.workspaceId),
     queryFn: ({ signal }) =>
@@ -91,7 +92,14 @@ function IdentityShell({ identity, children }: { identity: SessionIdentity; chil
           <Link
             key={label}
             href={href}
-            aria-current={pathname === href ? 'page' : undefined}
+            aria-current={
+              pathname === href.split('?')[0] &&
+              (label === 'My Incidents'
+                ? search.get('assignedToMe') === 'true'
+                : label !== 'Incidents' || search.get('assignedToMe') !== 'true')
+                ? 'page'
+                : undefined
+            }
             className="underline"
           >
             {label}
@@ -101,7 +109,7 @@ function IdentityShell({ identity, children }: { identity: SessionIdentity; chil
       <p role="status" className="text-sm text-muted">
         {state.status === 'refreshing'
           ? 'Refreshing your session…'
-          : 'Fictional workspace · Authentication demo'}
+          : 'Fictional workspace · Incident coordination demo'}
       </p>
       {current.isError && (
         <div role="alert" className="mt-4">

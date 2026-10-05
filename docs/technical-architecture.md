@@ -1,15 +1,15 @@
 # Incident Room — Technical Architecture
 
-**Status:** Phase 2 authentication lifecycle
+**Status:** Phase 3 incident management
 
 **Product authority:** [Accepted Phase 0 specification](product-spec.md)  
-**Implementation scope:** Foundation plus mocked authentication, session lifecycle, protected routing and identity-safe shell; no Incident business functionality
+**Implementation scope:** Foundation, mocked authentication/session lifecycle, identity-safe shell, Incident domain/list/filter/sort/create/policies and minimal real detail; no Timeline/Threads/realtime business functionality
 
 The accepted product specification remains an immutable Phase 0 snapshot. Its historical “Not started” marker is preserved; current implementation progress is tracked here and in README. This document introduces no new product behavior.
 
 ## 1. Architecture goals
 
-Support one coherent incident-coordination product with reliable identity isolation, paginated realtime history, durable optimistic work, and accessible responsive navigation. Authentication is implemented in Phase 2; incidents, threads, outbox/drafts and demo controls remain future work.
+Support one coherent incident-coordination product with reliable identity isolation, paginated realtime history, durable optimistic work, and accessible responsive navigation. Authentication is implemented in Phase 2; Phase 3 implements the incident management slice. Timeline, threads, outbox/drafts and demo controls remain future work.
 
 ## 2. Architectural principles
 
@@ -49,8 +49,11 @@ For a future real backend, request-scoped cookie-authenticated RSC checks/prefet
 src/
   app/                         Next.js routes, global CSS, metadata, composition
     _providers/                application wiring and per-mount Redux store
+    _incidents/                session-aware incident Query/routing integration
+    _mocks/                    app-level auth + incident authority composition
   features/
     session/                   auth forms, session coordinator/adapter, mock authority
+    incident-management/       incident use-case UI and mock authority/handlers
     realtime/                  transport contract and connection coordination
   shared/
     errors/                    typed application error categories
@@ -58,8 +61,9 @@ src/
     query/                     QueryClient defaults and identity scope keys
     ui/                        reusable non-domain error recovery surface
     testing/                   test setup only; never in production imports
-  entities/current-user/       validated current-user server resource and query key
-tests/e2e/                     browser smoke and authentication journeys
+  entities/current-user/       canonical current/workspace-user schemas and keys
+  entities/incident/           incident schemas, policy, filter codec, comparators and keys
+tests/e2e/                     browser smoke, authentication and incident journeys
 docs/                          product and technical source documents
 ```
 
@@ -305,7 +309,7 @@ No architecture-significant product decision is reopened. Later protocol/schema 
 
 ## 38. Explicit non-goals
 
-Phase 1 established tooling/providers/error foundation and contracts only. Phase 2 adds authentication/session infrastructure and the protected shell, but still excludes incident list/room, timeline, threads, notifications/search/palette business behavior, postmortem, demo UI, persistent drafts/outbox, realtime simulator/business transport, production backend, OAuth and domain actions. No private repository reference, proprietary fixture, copied implementation or speculative empty modules. Stop after Phase 2; Phase 3 requires explicit approval.
+Phase 1 established tooling/providers/error foundation and contracts only. Phase 2 added authentication/session infrastructure and the protected shell. The explicitly authorized Phase 3 adds only the incident entity, list/filter/sort, create, policy and minimal real incident context. It still excludes timeline, threads, notifications/search/palette business behavior, postmortem editing, status/severity/commander/participant mutation UI, demo UI, persistent drafts/outbox, realtime simulator/business transport, production backend and OAuth. No private repository reference, proprietary fixture, copied implementation or speculative empty modules. Stop after Phase 3; Phase 4 requires explicit approval.
 
 ## 39. Phase 1 acceptance criteria
 
@@ -320,6 +324,20 @@ Phase 1 established tooling/providers/error foundation and contracts only. Phase
 - Accepted product specification and clean-room requirements remain unchanged.
 - No incident business feature is substantially implemented.
 - Validation results and any environment blockers are recorded in completion report before commit/push.
+
+## 40. Phase 3 concrete incident slice
+
+- **Ownership:** `entities/incident` owns normalized incident schemas, severities/statuses, query-key factories, pure filters/comparators and semantic policies. Incident relationships are `commanderId`, `participantIds`, `serviceIds`; full profiles are not embedded. The existing `entities/current-user` is the canonical user entity layer and now also exposes the workspace-user resource (including deactivated status for policy/display). No sibling-entity imports or Redux resource mirror.
+- **Policies:** `entities/incident/policy.ts` implements view/create/write, severity/status, participant management, transfer, important-entry and separate postmortem capabilities. Active same-workspace users read/create; participants write operational content; commander/admin coordinate. Resolved forbids operational writes even for admins. Postmortem initiation requires Resolved, commander/admin and not initiated; draft edit requires an initiated resolved document and participant/commander/admin. No postmortem state or mutation UI is invented in this phase. `canTransition` permits only forward transitions; Resolved is terminal.
+- **Mock authority:** app-level `app/_mocks/browser.ts` composes independent auth and incident handlers. Incident handlers receive an authenticated actor from the existing auth authority, never a client-selected role/commander. They independently enforce semantic policy, schema and active workspace reference eligibility. One MSW worker handles all `/mock-api/` resources; unknown mock routes fail closed, unrelated Next assets bypass. Public browser mock is not a production security boundary.
+- **Persistence:** incident fictional server data uses a separate versioned IndexedDB database (`incident-room-fictional-incidents-v1`, singleton store `incidents`). Atomic read/write transactions serialize number allocation, record insert and idempotency receipt across tabs. It is not Query persistence, drafts or an outbox; no messaging/realtime synchronization is added. Seed: 32 fictional incidents, INC-2841 through INC-2872, all status/severity values and varied dates/assignments. Number allocation starts at INC-2873; authority clock owns creation/update times. Existing registered users can create and become commander.
+- **Catalogs:** workspace users reuse River Vale (admin), Sage Linden (member), plus registered fictional active members. Five static fictional service IDs/labels: aurora-edge/Aurora Edge, cedar-orders/Cedar Orders, lumen-identity/Lumen Identity, willow-storage/Willow Storage, ripple-delivery/Ripple Delivery. No service-management feature. Workspace-user response is bounded at 200 records; service catalog is static domain reference data.
+- **API/validation:** GET `/mock-api/workspace-users`, GET `/mock-api/incidents`, GET `/mock-api/incidents/:number`, POST `/mock-api/incidents` (`{input, requestId}`). Zod validates external responses and create input on both client and authority. The existing session-captured HTTP adapter exposes a generic resource method; app composition passes requests through `SessionCoordinator.request` and Query AbortSignal, without sibling-feature dependencies. Typed business errors stay AppError; 401 session codes retain refresh/terminal-expiry behavior. Minimal detail distinguishes loading/not-found/denied/retryable errors and displays no inaccessible incident context.
+- **URL:** centralized codec in `entities/incident/filters.ts`; `status`/`severity` are comma-separated stable values (repeated parameters accepted); `assignedToMe=true`; `participant=<active workspace ID>`; `from=YYYY-MM-DD`; `to=YYYY-MM-DD`; `sort=updated|newest|severity` (default updated, omitted canonically). Legacy `assigned=me` is read and rewritten to canonical assignment on the next control change. Invalid individual values are ignored, duplicates normalized, unknown unrelated parameters preserved. Impossible dates ignored; reversed ranges retain from and ignore to. Date range is createdAt, UTC, inclusive calendar days: `[from 00:00Z, day-after-to 00:00Z)`. Native labeled inputs, no date library. Controls navigate with Next Router history; refresh/back/forward reuse URL state, never Redux. Changed controls truncate cached target pagination to first page and remove cursor.
+- **Sort/pagination:** updatedAt descending then incident number; newest uses createdAt descending then number; severity uses explicit P1→P4 numeric rank then updatedAt descending then number. API returns at most 12 records plus nextCursor/total/workspaceTotal. Cursor uses last incident number and is bound to effective filters/sort/actor/workspace. It is a mock JSON token, not a credential or signed production cursor. Load more uses Query infinite queries. No list virtualization, offset fetching or whole-fixture client load. Cached confirmed pages survive background/pagination errors; no-match differs from an empty workspace. Filter controls remain visible while initial/new-key data loads; unrelated previous results are not shown under new filters.
+- **Query keys:** `['identity', userId, workspaceId, 'incidents', 'list', effectiveFilters]`, `[..., 'incidents', 'detail', number]`, and `[..., 'workspace-users']`. Factories own literals. Session generation guards reject late requests; identity teardown cancels/removes the entire identity prefix. New detail is seeded after confirmation and list-prefix queries invalidated before navigation.
+- **Creation:** RHF+Zod, trimmed title 1–160 and description ≤4000 characters, required P1–P4, validated optional service/participant IDs. Authority always sets Triggered, creator commander, creator included exactly once, and deduplicated selected active participants. No commander/status chooser. Confirmed mutation only, no automatic mutation retry/offline capability/optimistic local record. Per-form UUID receipt is scoped by workspace+actor; an identical manual retry returns the same record, differing input for an already-confirmed key conflicts. An ambiguous network outcome locks captured fields and retries the same key/payload. Pending ref and visible disabled controls prevent overlapping submits. Dirty close uses local native confirmation; after an ambiguous outcome it advises checking the list before creating another incident.
+- **Presentation/testing:** native HTML dialog supplies top-layer modality, focus containment and Escape; cleanup restores trigger focus. CSS switches one logical form to a full-screen mobile surface at <768px, preserving values/errors across resize. Browser tests assert actual dialog behavior; jsdom only stubs the missing native methods. Errors associate with fields and focus title/global failure; confirmed detail focuses its heading. Absolute Intl timestamps use explicit locale/UTC, avoiding relative-time hydration drift. Fresh memory stores and fresh Playwright contexts isolate tests; concurrent tabs exercise real IndexedDB serialization/persistence. No dependencies added; no visible reset/test control. Accepted product specification is unchanged.
 
 ## Public implementation references
 

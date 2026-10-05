@@ -145,6 +145,9 @@ export class MockAuthAuthority {
       delete data.clients[client];
     });
   }
+  users() {
+    return this.store.transact((data) => data.accounts.map((account) => account.user));
+  }
   /** Injection-only test API. Not an HTTP endpoint, UI control, or window global. */
   expire(client: string, refreshEligible = true) {
     return this.store.transact((data) => {
