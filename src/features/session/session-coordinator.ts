@@ -64,7 +64,12 @@ export class SessionCoordinator {
     this.controller = new AbortController();
     this.refreshTask = null;
     const generation = this.state.generation + 1;
-    this.emit({ status: reason === 'expired' ? 'expired' : 'anonymous', generation });
+    // Effect cleanup invalidates runtime work, not the persisted authority session.
+    // Keep access undecided across Strict Mode replay/retry until restore resolves.
+    this.emit({
+      status: reason === 'dispose' ? 'restoring' : reason === 'expired' ? 'expired' : 'anonymous',
+      generation,
+    });
     this.callbacks.cleared(identity);
     const previousBarrier = this.barrier;
     this.barrier = previousBarrier

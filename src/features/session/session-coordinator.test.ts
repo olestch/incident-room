@@ -55,6 +55,35 @@ const login = (coordinator: SessionCoordinator, email = 'river.vale@example.test
   coordinator.login({ email, password: DEMO_PASSWORD });
 
 describe('session infrastructure via actual MSW HTTP boundary', () => {
+  it('dispose invalidates identity and stale work without deciding anonymous or deleting the lease', async () => {
+    const r = runtime();
+    await login(r.coordinator);
+    const late = deferred<string>();
+    const scoped = deferred<AbortSignal>();
+    const request = r.coordinator.request((signal) => {
+      scoped.resolve(signal);
+      return late.promise;
+    }, 'safe-read');
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    const stop = vi.fn();
+    const clearDurableOnLogout = vi.fn(async () => {});
+    r.coordinator.registerLifecycle({ stop, clearDurableOnLogout });
+    await r.coordinator.dispose();
+    expect((await scoped.promise).aborted).toBe(true);
+    expect(r.state()).toEqual({ status: 'restoring', generation: 1 });
+    expect(r.query.getQueryCache().getAll()).toHaveLength(0);
+    expect(stop).toHaveBeenCalledWith(expect.objectContaining({ userId: 'demo-river' }), 'dispose');
+    expect(clearDurableOnLogout).not.toHaveBeenCalled();
+    late.resolve('obsolete result');
+    await rejected;
+    await r.coordinator.restore();
+    expect(r.state()).toMatchObject({
+      status: 'authenticated',
+      generation: 1,
+      identity: { userId: 'demo-river' },
+    });
+    r.query.clear();
+  });
   it('logout in a stale independent tab targets its captured client, not another newly authenticated client', async () => {
     let cookie = 'client-A';
     const forget = vi.fn();
