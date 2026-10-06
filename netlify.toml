@@ -1,0 +1,8 @@
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "24"
+  PNPM_FLAGS = "--frozen-lockfile"
+  PNPM_CONFIG_SHAMEFULLY_HOIST = "true"

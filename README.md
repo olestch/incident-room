@@ -6,7 +6,7 @@ Incident Room is a fictional realtime incident-coordination SaaS-style applicati
 
 [Run locally](#local-development) · [Demo credentials](#demo-credentials) · [Architecture](docs/technical-architecture.md) · [Deployment guide](docs/deployment.md)
 
-Live deployment: pending.
+Live deployment: pending; repository configuration is prepared for Netlify.
 
 Quick start with Node **24** and pinned pnpm **11.19.0**:
 
