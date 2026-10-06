@@ -1,15 +1,15 @@
 # Incident Room — Technical Architecture
 
-**Status:** Phase 7 Search, Notifications and Command Palette
+**Status:** Phase 9 portfolio Demo Mode and delivery readiness
 
 **Product authority:** [Accepted Phase 0 specification](product-spec.md)  
-**Implementation scope:** Phases 1–7: authentication, Incident management, Timeline, realtime/resync, Threads, Search, Notifications and Command Palette. Production WebSocket infrastructure, Postmortem/Action Items and visible Demo Mode remain future work. Earlier phase sections are historical records of their scoped implementations.
+**Implementation scope:** Phases 1–9: authentication, Incident management, Timeline, realtime/resync, Threads, Search, Notifications, Command Palette, Postmortem/Action Items and visible Demo Mode. No production backend/WebSocket server. Concrete-phase sections are historical scoped records; the [final requirement audit](portfolio-audit.md) records accepted gaps instead of claiming full product completeness.
 
 The accepted product specification remains an immutable Phase 0 snapshot. Its historical “Not started” marker is preserved; current implementation progress is tracked here and in README. This document introduces no new product behavior.
 
 ## 1. Architecture goals
 
-Support one coherent incident-coordination product with reliable identity isolation, paginated history, durable optimistic work, and accessible responsive navigation. Sections 41–44 record concrete Phase 4–7 decisions. Visible demo controls and Postmortem/Action Items remain future work.
+Support one coherent product with identity isolation, paginated history, durable optimistic work and accessible responsive navigation. Sections 41–46 record actual Phase 4–9 decisions. Full ordinary commander mutation/audit UI remains an acknowledged accepted gap; Demo is not its substitute.
 
 ## 2. Architectural principles
 
@@ -27,19 +27,19 @@ Next.js provides route composition, rendering, and static assets. The browser ow
 
 ## 4. Next.js rendering strategy
 
-Root layout, initial placeholder, metadata, and static route composition are Server Components. Interactive providers are a narrow Client Component island accepting server-rendered children. Future protected routes render a neutral shell on the server while browser mock session restoration determines authorized content. Sensitive mock resources are not fetched from RSC or prerendered into shared HTML.
+Root layout, landing, metadata and route composition are Server Components. Providers are a narrow Client Component island accepting server-rendered children. Protected routes render a neutral shell while browser mock restoration determines access. Sensitive mock resources are not fetched from RSC/prerendered into shared HTML.
 
 For a future real backend, request-scoped cookie-authenticated RSC checks/prefetch may be introduced with a separate QueryClient and hydration. They must preserve browser cache ownership and user isolation. No static export, experimental cache mode, server actions, or custom server is required now.
 
 ## 5. Server Component / Client Component boundaries
 
-| Surface                                                | Boundary            | Reason                                                                  |
-| ------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------- |
-| Root layout, static page, metadata                     | Server              | No browser APIs or application state required.                          |
-| Provider composition                                   | Client              | React context and per-mount runtime instances.                          |
-| Error recovery surface                                 | Client              | Retry callback and focus interaction.                                   |
-| Future Incident Room, forms, virtual timeline, threads | Client              | Continuous interaction, measurements, realtime, and optimistic updates. |
-| Future session gate                                    | Client in mock mode | MSW/browser session restoration precedes protected rendering.           |
+| Surface                                         | Boundary            | Reason                                                                  |
+| ----------------------------------------------- | ------------------- | ----------------------------------------------------------------------- |
+| Root layout, static page, metadata              | Server              | No browser APIs or application state required.                          |
+| Provider composition                            | Client              | React context and per-mount runtime instances.                          |
+| Error recovery surface                          | Client              | Retry callback and focus interaction.                                   |
+| Incident Room, forms, virtual timeline, threads | Client              | Continuous interaction, measurements, realtime, and optimistic updates. |
+| Session gate                                    | Client in mock mode | MSW/browser session restoration precedes protected rendering.           |
 
 `"use client"` is declared only at genuine boundaries. Module-level access to `window`, IndexedDB, or WebSocket is forbidden.
 
@@ -67,7 +67,7 @@ tests/e2e/                     browser smoke, authentication and incident journe
 docs/                          product and technical source documents
 ```
 
-Later `entities/<domain>/` modules own validated resource models, query keys/options, and pure rules. Add them when implemented, not as empty placeholders. Features implement use cases; routing composes features. Application integration orchestrates cross-feature service interactions.
+Entities own validated models/query keys/pure rules; features implement use cases and app composes services. Current modules also include Timeline, Threads, Search, Notifications, Postmortem and Demo; app `_discovery`, `_postmortem`, `_demo` own cross-feature wiring. No empty placeholder modules.
 
 ## 7. Dependency rules between modules
 
@@ -79,7 +79,7 @@ TypeScript uses `strict: true` to reject implicit unsafe values and unchecked nu
 
 ## 8. Routing architecture
 
-Phase 2 implements `/login`, `/register`, `/forgot-password`, and the `/app/*` client session gate. `/app/incidents` and recognized deeper product destinations are explicit placeholders, not business pages. The root layout remains server-side; public forms and protected shell are narrow client boundaries with Suspense around URL hooks. Anonymous protected navigation preserves path/query/hash as `returnTo`; authenticated login/register are public-only and immediately resume a safe destination.
+Public auth forms and `/app/*` session gate wrap real Incident, Thread, discovery, Postmortem, Team and Settings destinations. Root remains server-side with narrow interactive boundaries/Suspense around URL hooks. Anonymous protected navigation preserves path/query/hash as returnTo; login/register are public-only and resume validated destinations. Unknown routes fail closed.
 
 Authentication-boundary return uses `window.location.replace` on the centralized validated destination, intentionally creating a fresh browser runtime; ordinary app/public links remain Next Link/router navigation. E2E exposed duplicated `#context#context` with Next 16.3.8 client-cache navigation; the full auth-boundary navigation preserves the exact validated hash without changing product behavior or patching framework internals. This is a concrete integration choice, not a rendering/state ownership redesign.
 
@@ -117,7 +117,7 @@ Foundation defaults: stale time 30 seconds; GC 5 minutes; one retry for transien
 
 ## 12. Redux/client-state ownership
 
-Redux owns session/connection lifecycle and serializable local mutation ID/delivery-state coordination metadata. Hydrated local bodies remain in the room's transient projection, with durable ownership in IndexedDB. Confirmed resources/profile remain in Query; dialogs/forms remain local; the active target is URL-owned. Realtime checkpoints/buffers belong to identity-bound runtime services; ephemeral snapshots are room-local state. Demo settings remain future work. Runtime objects stay outside Redux.
+Redux owns session/connection lifecycle, serializable local mutation metadata and small validated Demo configuration. Hydrated local bodies are transient with durable ownership in IndexedDB. Confirmed resources/profile stay in Query, forms/dialogs local, targets URL-owned. Checkpoints/buffers/services stay outside Redux; ephemeral snapshots are room-local.
 
 Store factory is invoked per provider mount and typed hooks expose dispatch/selectors to app integration. Features do not import app hooks/store: application composition passes semantic state/commands to their UI, and services accept injected lifecycle callbacks. Default immutability/serializability middleware stays enabled; DevTools enabled only outside production. No sockets, DOM nodes, timers, controllers, Promises, errors, QueryClient, or database handles in state. Services dispatch plain serializable lifecycle facts through application wiring.
 
@@ -157,7 +157,7 @@ Create `clientMutationId` once per message, keep it across retry. Persist before
 | Resync finds successful unknown action | Confirm locally, remove durable pending content after acknowledgment.                     |
 | Definitive rejection                   | Failed state with Retry/Delete, retaining body.                                           |
 
-The Timeline authority enforces idempotency by workspace/incident/user/clientMutationId. Row identity includes the author and mutation UUID, remaining stable across confirmation. Retry never creates a new identity. Definitive HTTP 4xx rejection is failed; timeout, transport or malformed-response ambiguity requires outcome lookup. Timeline human-message creation is implemented; other mutations remain future work.
+The Timeline authority enforces idempotency by workspace/incident/user/clientMutationId. Row identity includes the author and mutation UUID, remaining stable across confirmation. Retry never creates a new identity. Definitive HTTP 4xx rejection is failed; timeout, transport or malformed-response ambiguity requires outcome lookup. Timeline messages and Thread replies use this lifecycle; Postmortem updates use revision CAS. Ordinary commander commands remain a documented product gap.
 
 ## 16. Outbox architecture
 
@@ -209,31 +209,31 @@ Trim query; remote global search starts at two characters after a 200 ms debounc
 
 ## 25. Error handling
 
-`AppError` carries a safe category/message/status, not raw server bodies or secrets. Categories: validation, authentication, authorization, not-found, conflict, network, realtime, unexpected. Later HTTP parsing validates error envelopes and maps unknown errors safely.
+`AppError` carries safe category/message/status, not raw bodies/secrets. Categories: validation, authentication, authorization, not-found, conflict, network, realtime, unexpected. HTTP error envelopes validate before safe mapping; unknown failures use generic feedback.
 
 Fields get validation errors; unauthorized mutations revert/reconcile and explain; expiry goes to session coordinator; pagination/thread errors remain local; conflict preserves unsaved postmortem input; connection loss stays non-blocking; unexpected render failures use route/global boundaries with retry/home. Do not replace all errors with toasts. Mutation ambiguity is handled by outbox, not generic read retry.
 
 ## 26. Logging/diagnostics
 
-Foundation exposes an injectable structured diagnostic sink with allowlisted event names and numeric metadata (attempt, duration, count). It cannot accept token/body/URL/free-form user context. No vendor and no noisy default console sink. Development may opt into a safe sink; future demo diagnostics use a bounded ring buffer. Realtime revision/dedupe/resync/outcome categories are sufficient for troubleshooting without message content. Rendering fallback never prints raw exception text.
+Diagnostics allow event categories and numeric metadata only, never tokens/body/URL/free-form context. No vendor/noisy default sink or public diagnostic history viewer. Realtime revision/dedupe/resync/outcome categories permit safe inspection; render fallback never prints raw exceptions.
 
 ## 27. Demo Mode architecture
 
-Later one application runtime chooses mock HTTP and mock transport, injecting seeded factories, scheduler, latency/failure policy, and event journal. Redux owns demo controls; mock runtime consumes a snapshot of configuration. Features do not branch on demo flags. Expose isolated developer surface only in selected demo build; route permissions do not derive from demo controls. Seed + logical clock + operation counter make datasets and faults repeatable; reset is explicit and clears mock/durable demo state after confirmation.
+The public fictional build intentionally exposes collapsed Demo controls. Redux owns validated scalar configuration; app composition feeds `DemoPolicy` into MSW scheduling and binds setOnline on the existing coordinator. Auth/polling/Demo operations are exempt from resource latency/failure scheduling. Counter-local deterministic pre-persistence failures are distinct from existing ambiguity fixtures. Authority generator/source journal handles activity and datasets; no feature-level demo branches. Maintenance-only shared page lease/exclusive reset requires other app tabs closed, stops/drains session/local work and in-flight mock requests, then clears explicit known stores; not a client outbox/refresh ownership protocol or a global cross-database transaction. See §46.
 
 ## 28. Accessibility architecture
 
-Semantic landmarks, skip link, visible focus, labeled states, and reduced-motion CSS start now. Later install specific Radix primitives when modal/sheet/palette requires focus trapping; no unused component library now. Shared live-region conventions summarize realtime bursts politely. Target navigation announces one target and restores initiating focus on close. Virtualized rows maintain list position metadata and focus retention. RTL asserts roles/name/keyboard recovery; Playwright checks actual browser keyboard behavior. Do not confuse a static axe score with complete assistive-technology behavior.
+Semantic landmarks, skip link, visible focus, labelled textual states and reduced-motion CSS apply across journeys. Native HTML dialogs provide actual modal focus containment; no Radix/shadcn package. Target announcements/focus restore and virtual row pinning are implemented. Demo uses native details/fieldset/select/button. RTL and browser keyboard checks complement inspection, not assistive-technology certification.
 
 ## 29. Responsive architecture
 
-Mobile-first CSS uses 48rem context-detail and 64rem two-column thresholds. Desktop keeps incident context beside Timeline; mobile condenses context but preserves status/severity/heading. The viewport uses dynamic viewport units and compose includes safe-area padding. Resize remeasures rows without recreating URL target, draft or delivery coordination. Threads/panel migration remain future work. No device-specific domain stores.
+Mobile-first CSS uses 48rem context and 64rem contextual Thread thresholds. Desktop keeps Timeline primary, mobile condenses context and migrates one logical Thread surface without recreating target/draft/delivery. Dynamic viewport units/safe-area compose, measured width changes and no device-specific domain stores. Phase 9 checks 320/768/1280 Demo layout.
 
 ## 30. Testing strategy
 
 Vitest with Vite React transform, jsdom, Testing Library, jest-dom, and user-event. Unit tests verify query retry policy and fresh store isolation; component tests verify keyboard-triggered error recovery and provider interaction with Redux/Query in independent scopes. No large snapshots or future business tests.
 
-Playwright runs desktop/mobile Chromium against production `build` + `start`. Auth, incident management, draft/outbox recovery, optimistic/failed/unknown delivery, anchor, old target/tombstone, supersession and responsive Timeline flows are implemented. Phase 5 adds independent-client realtime, recovery, expired snapshots, presence/typing and metadata flows. Thread migration remains future work. Async Server Components are validated through browser E2E, not jsdom.
+Playwright uses production build/start in desktop/mobile Chromium: auth, Incidents, delivery/storage recovery, anchors/old targets, independent-client realtime/expiry, responsive Threads, discovery, Postmortem conflicts and Demo. Async Server Components are checked in browsers, not jsdom. The deterministic showcase also attaches six app-only screenshots.
 
 Phase 2 integration tests use real MSW node handlers and the injected in-memory authority/clock: single-flight refresh, late 401, proactive refresh, non-replayed mutation, terminal teardown, stale A → logout → B, cleanup failure/retry and malformed response. Form tests exercise semantic validation/focus/submission/error/recovery. Browser tests cover protected/deep return including exact query/hash, register/reload, logout/switch, generic recovery, valid/terminal expiry, public-only gates, unknown routes and 320px/tablet overflow/keyboard behavior in desktop/mobile projects. Expiry is forced through the injected authority API in unit tests and test-only IndexedDB lease fixtures in E2E; no visible control, test HTTP endpoint or window global exists.
 
@@ -245,7 +245,7 @@ MSW handles HTTP; deterministic service rules are separate from handlers and reu
 
 The generated `public/mockServiceWorker.js` is an unchanged MSW 2.15.0 vendor asset, ignored by formatting/lint only; all application code remains checked. Browser MSW runs in the portfolio production build as well as development so `build/start` demonstrates auth. It suppresses request/body logging and surfaces unmatched auth-namespace requests; unrelated Next/static traffic is bypassed. Native fetch is resolved at call time with its correct global receiver, after interception initialization. No mock APIs are invoked from feature UI.
 
-Incident CRUD/list, Timeline window/locator/outcome/create and realtime open/stream/sync/snapshot handlers exist. Mock authorities are separate from MSW; app composition injects auth, source-change ingestion and resource reconciliation. Postmortem conflicts remain future work. Timeline fixtures are lazily generated per requested room, not at application startup.
+Incident read/create/list, Timeline/Thread window/locator/outcome/create, realtime open/stream/sync/snapshot, discovery and Postmortem CAS handlers exist. Authorities are separate from MSW; app injects auth/ingestion/reconciliation. Fixtures are lazy per room. Ordinary commander command UI remains missing, not a claimed CRUD update/delete implementation.
 
 For multi-tab convergence mock authorities use IndexedDB transactions for confirmed mock resources/session/event journal, distinct from user-local draft/outbox stores. Each tab's MSW handlers read that authority; independent transport simulators poll journal with per-tab cursors and can intentionally miss/delay/duplicate delivery. This is ordinary simulated server/realtime synchronization, not direct tab messaging or shared client coordination. Tests use in-memory authorities where appropriate. Mock persistence is fictional browser data, never a production backend/security claim.
 
@@ -253,37 +253,36 @@ Realtime simulator implements the same transport port: injectable scheduler and 
 
 ## 32. Environment/configuration strategy
 
-No custom environment variable is required in Phase 1, so no `.env.example` is invented. Next's NODE_ENV governs DevTools/test server policy. Later public demo/service selectors must be non-secret and validated with Zod; server credentials belong only to server environment/modules. NEXT_PUBLIC values are exposed to every browser and may not hold secrets. Relative same-origin mock requests avoid accidental production endpoints.
+No custom environment variable/secrets are required in the final public fictional build. NODE_ENV governs DevTools/test policy; Demo configuration is validated without a build-time secret toggle. Relative same-origin mock requests avoid production endpoints. Any future NEXT_PUBLIC value is public and cannot carry credentials.
 
 ## 33. Security considerations
 
-Rendering uses escaped untrusted text; no arbitrary HTML/Markdown. Future detected URLs admit safe HTTP(S) protocols, rejecting executable/data schemes. Validate HTTP/realtime/persistence data with Zod. Safe return URL validation prevents open redirects. Real backend authorization is independent of frontend policy. Identity teardown includes stale async generation protection and durable logout cleanup. No passwords/tokens in logs, Query, Redux, URLs, or durable local stores. Mock users, services, URLs, and data are fictional. Product section 35 remains unmodified and mandatory.
+Rendering uses escaped untrusted text; no arbitrary HTML/Markdown. Detected URLs admit safe HTTP(S) protocols, rejecting executable/data schemes. Validate HTTP/realtime/persistence data with Zod. Safe return URL validation prevents open redirects. Real backend authorization is independent of frontend policy. Identity teardown includes stale async generation protection and durable logout cleanup. No passwords/tokens in logs, Query, Redux, URLs, or durable local stores. Mock users, services, URLs, and data are fictional. Product section 35 remains unmodified and mandatory.
 
 ## 34. Performance strategy
 
-Static shell is server-rendered with minimal client providers; no remote font fetch during build. Feature modules are loaded with their route; simulator and diagnostics do not enter unrelated bundles. Query pages are bounded, loaded IDs indexed, updates batched, and stale identity caches cleared. Virtualizer limits DOM work, not just data fetches. Avoid repeated full sort/map and giant Redux serializability scans of confirmed timelines. Later benchmark seeded 50,000-entry room (DOM count, scroll responsiveness, merge/measurement latency) on repeatable browser hardware; no unverifiable performance claims now.
+Static shell is server-rendered with minimal client providers; no remote font fetch during build. Feature modules are loaded with their route; simulator and diagnostics do not enter unrelated bundles. Query pages are bounded, loaded IDs indexed, updates batched, and stale identity caches cleared. Virtualizer limits DOM work, not just data fetches. Avoid repeated full sort/map and giant Redux serializability scans of confirmed timelines. Phase 9 browser checks exercise a 50,000-entry room, bounded DOM and old Timeline/Thread targets. Repeatable hardware scroll/merge/measurement latency benchmarking remains future investigation; no throughput or FPS guarantee is claimed.
 
 ## 35. Dependency decisions
 
 Exact versions are pinned in package.json; lockfile is committed. Node 24 and pnpm 11.19.0 are the project baseline. Registry stable tags were checked during initialization.
 
-| Dependency                                                   | Owner/purpose                   | Justification                                                      |
-| ------------------------------------------------------------ | ------------------------------- | ------------------------------------------------------------------ |
-| Next.js, React, React DOM                                    | app runtime                     | App Router, RSC composition, interactive rendering.                |
-| TypeScript, React/Node types                                 | all source                      | Strict compile-time contracts.                                     |
-| Redux Toolkit, react-redux                                   | app coordination/providers      | Serializable client lifecycle state and typed hooks.               |
-| TanStack Query                                               | shared/query + future entities  | Server cache, cancellation, infinite queries, invalidation.        |
-| TanStack Virtual                                             | timeline feature                | Measured variable-height viewport with keyed prepend anchoring.    |
-| React Hook Form, Zod                                         | future forms/runtime boundaries | Form lifecycle and validation of unknown data.                     |
-| Tailwind, PostCSS adapter, PostCSS                           | app styles/build                | Small token-based mobile-first styling, current Tailwind v4 setup. |
-| MSW                                                          | future mock HTTP/test boundary  | Deterministic HTTP interception without production backend.        |
-| Vitest, Vite, React plugin                                   | testing build                   | Isolated TS/React test transforms.                                 |
-| RTL, DOM Testing Library, jest-dom, user-event, jsdom        | component tests                 | Behavior/keyboard/semantic assertions.                             |
-| Playwright                                                   | browser tests                   | Real routing/rendering/viewport and future lifecycle tests.        |
-| ESLint, eslint-config-next                                   | engineering boundaries          | Next/React/accessibility lint and import restrictions.             |
-| Prettier                                                     | formatting                      | Consistent reviewable source/config/document formatting.           |
-| Native WebSocket, IndexedDB, AbortController, ResizeObserver | runtime adapters                | Selected platform capabilities require no extra package.           |
-| Radix UI/shadcn primitives                                   | later accessible surfaces       | Deferred until dialog/palette exists; no unused dependency now.    |
+| Dependency                                                            | Owner/purpose                    | Justification                                                                                       |
+| --------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Next.js, React, React DOM                                             | app runtime                      | App Router, RSC composition, interactive rendering.                                                 |
+| TypeScript, React/Node types                                          | all source                       | Strict compile-time contracts.                                                                      |
+| Redux Toolkit, react-redux                                            | app coordination/providers       | Serializable client lifecycle state and typed hooks.                                                |
+| TanStack Query                                                        | shared/query + resource features | Server cache, cancellation, infinite queries, invalidation.                                         |
+| TanStack Virtual                                                      | timeline feature                 | Measured variable-height viewport with keyed prepend anchoring.                                     |
+| React Hook Form, Zod                                                  | forms/runtime boundaries         | Form lifecycle and validation of unknown data.                                                      |
+| Tailwind, PostCSS adapter, PostCSS                                    | app styles/build                 | Small token-based mobile-first styling, current Tailwind v4 setup.                                  |
+| MSW                                                                   | mock HTTP/test boundary          | Deterministic HTTP interception without production backend.                                         |
+| Vitest, Vite, React plugin                                            | testing build                    | Isolated TS/React test transforms.                                                                  |
+| RTL, DOM Testing Library, jest-dom, user-event, jsdom                 | component tests                  | Behavior/keyboard/semantic assertions.                                                              |
+| Playwright                                                            | browser tests                    | Real routing/rendering/viewport and lifecycle tests.                                                |
+| ESLint, eslint-config-next                                            | engineering boundaries           | Next/React/accessibility lint and import restrictions.                                              |
+| Prettier                                                              | formatting                       | Consistent reviewable source/config/document formatting.                                            |
+| IndexedDB, Web Locks, Service Worker, AbortController, ResizeObserver | runtime adapters                 | Selected platform capabilities require no extra package; native WebSocket remains a future adapter. |
 
 Compatibility choices: TypeScript 5.9.3 remains inside typescript-eslint's supported range (`>=4.8.4 <6.1.0`; latest TypeScript 7 is outside it). ESLint 9.39.5 is retained despite its end-of-support warning because the current stable eslint-config-next dependencies eslint-plugin-react, eslint-plugin-import, and eslint-plugin-jsx-a11y do not declare ESLint 10 support. This is an explicit compatibility limitation, not a silent outdated-tool choice; upgrade once that peer support lands. jsdom 27.4.0 supports installed Node 24.8 (latest jsdom requires newer Node 24). MSW 2.15.0 is selected because Vitest 5's mocker currently declares MSW `^2.4.9` compatibility, not MSW 3; no unsupported peer override is used. Other selected libraries use compatible stable releases. No RTK Query, Zustand, Socket.IO, persistence framework, icon pack, observability vendor, or large UI library.
 
@@ -301,7 +300,7 @@ GitHub Actions on main pushes and pull requests: checkout → pinned pnpm → No
 | Realtime                 | Component sockets, Socket.IO                        | Transport port + service + routing; no extra protocol requirement.                                                             |
 | Mock multi-tab           | Per-tab memory only, BroadcastChannel               | Shared fictional authority/event journal read by independent clients; ordinary synchronization without cross-tab coordination. |
 | Virtual navigation       | Timer retries, load all history                     | Locator/windows plus cancellable readiness signals; scales to distant target and variable measurement.                         |
-| UI package               | Full component library, premature design system     | Tailwind tokens now; specific Radix primitives when needed.                                                                    |
+| UI package               | Full component library, premature design system     | Tailwind tokens and native HTML dialogs, no unused Radix/shadcn dependency.                                                    |
 | CI E2E                   | Defer all browser checks, all engines               | Small production-shell Chromium smoke in two viewports.                                                                        |
 | Formatting accepted spec | Reformat all Markdown                               | Ignore accepted Phase 0 file to preserve exact source.                                                                         |
 
@@ -309,7 +308,7 @@ No architecture-significant product decision is reopened. Later protocol/schema 
 
 ## 38. Explicit non-goals
 
-Phases 1–4 established tooling, session lifecycle, incident management and Timeline/local work. Authorized Phase 5 adds mock realtime, reconnect/resync and presence/typing. It excludes Threads, notifications/search/palette business behavior, postmortem editing, status/severity/command/participant action UI, visible Demo Mode, production backend/WebSocket server and OAuth. No private repository reference, proprietary fixture or copied implementation. Stop after Phase 5; Phase 6 requires explicit approval.
+Final scope excludes production backend/native WebSocket infrastructure, OAuth, external integrations, billing, analytics, AI, rich text/attachments and offline background delivery. Ordinary commander mutation/audit UI remains a documented accepted gap, not a completed feature. Phase 9 is the final authorized portfolio phase; no subsequent feature work begins. Concrete earlier phase sections below are historical scope records, not current missing-feature claims.
 
 ## 39. Phase 1 acceptance criteria
 
@@ -409,6 +408,14 @@ Phases 1–4 established tooling, session lifecycle, incident management and Tim
 - **Notifications:** only initiation to relevant participants/commander and new/changed assignment to an active assignee; existing actor-excluding, active-workspace eligibility, source receipts, private-recipient checkpoints and absolute unread summary apply. Ordinary document text and Action status/text changes produce no activity spam. Canonical destination is the single Postmortem route, not a new deep-link/search subsystem.
 - **Navigation/accessibility:** labelled multiline sections, native date/select controls, textual status/read-only state, associated validation errors, conflict alerts and save status. One-column mobile layout/card forms have no horizontal table. Editor-lifetime beforeunload + capture-phase ordinary link warnings and a narrow app callback protect Commands/create/sign-out; declined navigation retains fields. New-tab links are non-destructive. Native same-document browser Back/Forward is intentionally not intercepted with fragile global history traps; local work is transient and this limitation is documented. Retained conflict copies disappear on leaving the page. No unrelated navigation framework or Timeline rewrite.
 - **Tests/scope:** pure/domain CAS/concurrent-save, source/assignee/date validation, permissions, idempotent receipts, revision merges, RHF dirty/clean/conflict/reference recovery, app absent/initiation/read-only/deny/navigation, HTTP/error schema and recoverable notification/journal ingestion tests. Desktop/mobile two-client browser scenarios cover participant edit, read-only member, stale document/item saves, dirty preservation, source selection/tombstones, assignment notification, reconnect with expired checkpoint and constrained layout. Full check counts and CI status belong to the completion report. Product Specification remains byte-for-byte unchanged; no Phase 9, visible Demo Mode, analytics or private commercial material.
+
+## 46. Phase 9 Demo and portfolio decisions
+
+- **Configuration:** `features/demo` owns validated latency/failure/realtime/dataset/event scalars and reducer; `_demo` composes runtime ports. Tab-local, full reload defaults. No new dependency, auth fault, production server or global feature flags. Method+pathname counters deterministically fail first 1/3 slots per ten after each configuration change; delay occurs in MSW scheduling, not UI.
+- **Controls/activity:** collapsed shell surface, actual coordinator setOnline and existing journal resync; no second transport. Monitoring/deployment/human authority changes use stable counter IDs/logical time; forward status generation checks central permission + current revision CAS, records source audit event and existing notification metadata. There is no ordinary commander UI claim. Other fictional author must be an active same-workspace participant. No unsupported domain or client-only fake event.
+- **Maintenance:** Web Locks shared page lease exists only to reject destructive replacement/reset while another app tab is active. Exclusive maintenance captures identity, pauses new HTTP, disposes/drains current session/local work, awaits started mock requests, and operates explicit named native stores. Reset clears all fictional authorities and local work, then login/seed. Dataset replacement resets INC-2841 Timeline/Threads, workspace journal and all local identity work; fresh route/checkpoints follow. Unrelated origin storage stays untouched. Partial storage failure is not globally atomic; reload/retry reset before trusting state. Unsupported Web Locks refuses safely. This is not cross-tab runtime synchronization/ownership.
+- **Packaging:** landing/metadata/Team/Settings now describe actual product, README is a reviewer entry with real stack and fictional fast path; no uninstalled Radix/shadcn or native WebSocket claim. Architecture historical concrete-phase records remain labelled historical. ProductSpec unchanged, final mapping discloses commander subsystem gap and browser preferences/dirty-history limitations. Screenshot workflow uses existing Playwright attachments, no bulky binary assets or visual regression subsystem.
+- **Quality/deployment:** focused deterministic Demo tests and production browser flows cover request latency/failure, real offline/resync, persistent activity, 50k bounded DOM/old Thread, exclusive reset and responsive keyboard surface. Existing 10k/projection boundaries remain. Stable allowed local E2E configuration and normal CI are reported honestly; unchanged six-worker observation stays documented. Node/Next HTTPS deployment requirements and actual remote smoke/manual account step live in deployment.md, not an invented hosted URL.
 
 ## Public implementation references
 

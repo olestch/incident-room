@@ -8,7 +8,9 @@ test('public shell supports keyboard access and a narrow viewport without runtim
   await page.goto('/');
   await expect(page).toHaveTitle('Incident Room');
   await expect(page.getByRole('heading', { name: 'Incident Room', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Implementation in progress' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Realtime coordination, from investigation to Postmortem' }),
+  ).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
   await page.keyboard.press('Enter');

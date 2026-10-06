@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import { bindDemoConnection, demoOnline } from '@/app/_demo/runtime';
 import { useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { incidentKeys, type Incident } from '@/entities/incident/model';
@@ -85,14 +86,16 @@ export function useListRealtime(enabled: boolean, userId: string, workspaceId: s
       clearDurableOnLogout: async () => {},
     });
     const offline = () => service.setOnline(false);
-    const online = () => service.setOnline(true);
+    const online = () => service.setOnline(demoOnline());
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
     service.start();
+    const unbindDemo = bindDemoConnection((online) => service.setOnline(online));
     if (!navigator.onLine) service.setOnline(false);
     return () => {
       active = false;
       service.dispose();
+      unbindDemo();
       remove();
       window.removeEventListener('offline', offline);
       window.removeEventListener('online', online);

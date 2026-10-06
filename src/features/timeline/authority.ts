@@ -77,6 +77,66 @@ export class MockTimelineAuthority {
     private readonly store: AtomicStore<AuthorityData>,
     private readonly now = Date.now,
   ) {}
+  replaceDataset(actor: IncidentActor, incident: Incident, count: number) {
+    if (![100, 1000, 10000, 50000].includes(count))
+      throw new AppError('validation', 'Invalid dataset size.', 400);
+    return this.store.transact(this.room(actor, incident), (data) => {
+      Object.assign(data, seedTimeline(JSON.stringify([incident.workspaceId, incident.id])), {
+        entries: generateTimeline(incident.id, count),
+        nextOrder: count + 1,
+      });
+    });
+  }
+  generate(
+    actor: IncidentActor,
+    incident: Incident,
+    kind: 'monitoring' | 'deployment' | 'human',
+    authorId: string,
+  ) {
+    if (!canWriteIncident(actor, incident))
+      throw new AppError('authorization', 'Active incident participation is required.', 403);
+    return this.store.transact(this.room(actor, incident), (data) => {
+      const order = data.nextOrder++;
+      const time = new Date(
+        Math.max(
+          Date.parse(incident.createdAt),
+          Date.parse(data.entries.at(-1)?.occurredAt ?? incident.createdAt),
+        ) + 60000,
+      ).toISOString();
+      const variants = {
+        monitoring: {
+          type: 'monitoring_event',
+          source: 'Demo Lumen monitor',
+          summary: `Demo activity ${order}: fictional edge latency probe completed.`,
+        },
+        deployment: {
+          type: 'deployment_event',
+          service: 'Aurora Edge',
+          version: `v0.demo.${order}`,
+          summary: `Demo activity ${order}: fictional canary deployed.`,
+        },
+        human: {
+          type: 'human_message',
+          authorId,
+          body: `Demo activity ${order}: checking the fictional mitigation with @River [demo-river].`,
+        },
+      };
+      const entry = timelineEntrySchema.parse({
+        id: `${incident.id}:demo-${order}`,
+        incidentId: incident.id,
+        occurredAt: time,
+        createdAt: time,
+        serverTieOrder: order,
+        revision: 1,
+        important: false,
+        tombstone: null,
+        ...variants[kind],
+      });
+      data.entries.push(entry);
+      data.changes.push({ kind: 'timeline_created', entry });
+      return entry;
+    });
+  }
   inspectSearchable<T>(
     actor: IncidentActor,
     incident: Incident,

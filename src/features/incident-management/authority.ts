@@ -5,10 +5,16 @@ import {
   createIncidentSchema,
   severities,
   statuses,
+  canTransition,
   services,
   type Incident,
 } from '@/entities/incident/model';
-import { canCreateIncident, canViewIncident, type IncidentActor } from '@/entities/incident/policy';
+import {
+  canCreateIncident,
+  canViewIncident,
+  canChangeStatus,
+  type IncidentActor,
+} from '@/entities/incident/policy';
 import {
   compareIncidents,
   matchesIncident,
@@ -231,11 +237,25 @@ export class MockIncidentAuthority {
     actor: IncidentActor,
     number: string,
     patch: Partial<Pick<Incident, 'status' | 'severity' | 'participantIds'>>,
+    expectedRevision?: number,
   ) {
     return this.store.transact((data) => {
       const previous = data.incidents.find((i) => i.number === number);
       if (!previous || !canViewIncident(actor, previous))
         throw new AppError('authorization', 'Access denied.', 403);
+      if (expectedRevision !== undefined) {
+        if (previous.revision !== expectedRevision)
+          throw new AppError('conflict', 'Incident changed. Review its current status.', 409);
+        if (
+          patch.status &&
+          (!canChangeStatus(actor, previous) || !canTransition(previous.status, patch.status))
+        )
+          throw new AppError(
+            'authorization',
+            'No authorized forward transition is available.',
+            403,
+          );
+      }
       const time = new Date(this.now()).toISOString();
       const next = incidentSchema.parse({
         ...previous,

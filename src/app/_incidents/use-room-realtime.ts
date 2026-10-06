@@ -1,5 +1,6 @@
 'use client';
 import { applyNotification } from '@/app/_discovery/notification-cache';
+import { bindDemoConnection, demoOnline } from '@/app/_demo/runtime';
 import { applyPostmortemEvent } from '@/app/_postmortem/cache';
 import { notificationKeys } from '@/entities/notification/model';
 import { postmortemKeys } from '@/entities/postmortem/model';
@@ -339,14 +340,16 @@ export function useRoomRealtime(
       clearDurableOnLogout: async () => {},
     });
     const offline = () => service.setOnline(false);
-    const online = () => service.setOnline(true);
+    const online = () => service.setOnline(demoOnline());
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
     service.start();
+    const unbindDemo = bindDemoConnection((online) => service.setOnline(online));
     if (!navigator.onLine) service.setOnline(false);
     return () => {
       active = false;
       service.dispose();
+      unbindDemo();
       removeLifecycle();
       window.removeEventListener('offline', offline);
       window.removeEventListener('online', online);

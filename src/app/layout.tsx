@@ -7,7 +7,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Incident Room',
   description:
-    'Incident coordination for engineering and operations teams. Implementation in progress.',
+    'A fictional realtime incident-coordination portfolio: virtual Timeline, Threads, reconnect/resync and conflict-safe Postmortems built with React and Next.js.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

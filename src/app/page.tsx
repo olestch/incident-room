@@ -14,16 +14,21 @@ export default function HomePage() {
         className="mt-10 rounded-xl border border-line bg-surface p-6"
       >
         <h2 id="progress-heading" className="text-xl font-semibold">
-          Implementation in progress
+          Realtime coordination, from investigation to Postmortem
         </h2>
         <p className="mt-3 leading-relaxed text-muted">
-          Authentication and session lifecycle are available. Incident workflows will arrive in
-          subsequent phases.
+          Explore a virtual Timeline, contextual Threads, Search, Notifications and conflict-safe
+          Postmortems. Demo Mode lets you reproduce latency, failures, reconnect and large datasets.
+          This public portfolio uses a browser-simulated backend, not production infrastructure.
         </p>
       </section>
       <Link href="/login" className="mt-6 inline-block rounded-lg bg-ink px-5 py-3 text-white">
         Sign in to the fictional workspace
       </Link>
+      <p className="mt-6 text-sm text-muted">
+        Fictional credentials: river.vale@example.test · Fictional-pass-42. Never enter a real
+        password. Start with INC-2841; use INC-2865 for Postmortem editing.
+      </p>
     </main>
   );
 }

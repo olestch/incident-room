@@ -1,86 +1,66 @@
 # Incident Room
 
-Incident Room is a public portfolio project for coordinating technical incidents. Dedicated incident rooms will combine operational context, a realtime timeline, contextual discussions, and postmortem documentation using fictional, deterministic data.
+A fictional incident-coordination portfolio demonstrating complex React client architecture: large variable-height history, durable optimistic work, reconnect/resynchronization and contextual navigation in one product.
 
-**Current status:** Phases 1–8 implemented, including structured Postmortems and revision-safe Action Items. Explicit Save, stale-edit conflicts, preserved dirty forms and existing realtime/resync support shared drafts on Resolved incidents. Search, recipient Notifications and the accessible Command Palette retain their Phase 7 scope. Visible Demo Mode / portfolio polish remain next; production WebSocket infrastructure is not implemented.
+**React 19 · Next.js 16 · TypeScript · Redux Toolkit · TanStack Query · TanStack Virtual · IndexedDB.** Browser-simulated backend, **not production incident infrastructure or authentication**.
 
-The accepted [Product Specification](docs/product-spec.md) defines product behavior. [Technical Architecture](docs/technical-architecture.md) defines ownership, runtime boundaries, persistence, realtime, and testing decisions. The accepted Phase 0 document is preserved unchanged, including its historical implementation-status marker.
+## Try it
 
-## Postmortem and Action Items
-
-Resolved Incident Rooms expose Create/Edit/View Postmortem at `/app/incidents/:number/postmortem` (try INC-2865 for River commander/Sage participant; INC-2845 for River commander/Sage read-only). Commander/admin initiate one shared draft; participants/commander/admin edit; active workspace members view. Summary, Impact, Root Cause and Resolution are plain-text sections with explicit Save; Timeline contains up to 100 chronological source references, including tombstones. Removing a reference never deletes a source. Browse source choices in bounded 60-entry pages.
-
-Every document and Action Item save checks its own expected revision. Newer confirmed edits never silently overwrite dirty fields. Review latest, then explicitly Reload latest with confirmation; a transient local reference copy remains on the page for manual copying. No automatic merge, autosave, version history, publish/approval workflow, durable Postmortem drafts or message outbox reuse. Native reload/close, app links, command navigation and sign-out warn before losing unsaved edits; browser-owned same-document Back/Forward is not intercepted by a global history framework.
-
-Action Items have title, optional description/active-user assignee/date-only due date, and Open/In progress/Done status. Any explicit transition is allowed; deletion is omitted. Each Postmortem is capped at 200 items. Assignment changes and Postmortem initiation reuse the existing recipient notifications; ordinary text/status saves do not spam notifications. Reconnect/expired snapshots converge confirmed Query state while dirty form text stays intact. This is a fictional server-backed ordinary edit/save model, not offline-first collaborative editing. The latest Phase 8 task explicitly extends the accepted spec's initial text-only Action Items with these fields; the Product Specification is unchanged. Search scope is unchanged.
-
-Local validation boundary: this Windows host's unchanged six-worker runs exhibited intermittent old realtime/Thread startup/resync timeouts. A timeout also reproduced against Phase 7's application/test sources (`2e528b5`), so it is not claimed to be a Phase 8 fix. All new Phase 8 browser scenarios pass at six workers. The full suite also passes at the repository's existing CI concurrency (two workers), with retries explicitly disabled for this diagnostic. No worker/retry/timeout, assertion or CI configuration was changed. Actual GitHub Actions still requires an authorized push and observation of that exact commit.
-
-## Development setup
-
-Use Node.js 24 and pnpm 11.19.0 (pinned in `package.json`). Install pnpm through your preferred package-manager setup, or use `corepack prepare pnpm@11.19.0 --activate` where Corepack is available.
+No hosted URL is claimed yet. [Deployment instructions](docs/deployment.md) describe the remaining owner account/import step. Locally:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open http://localhost:3000 and follow Sign in, or open `/app/incidents` directly. No environment variables or secrets are required. Browser Service Workers, Web Crypto and IndexedDB must be available (localhost or HTTPS).
+Node **24**, pinned pnpm **11.19.0**. Open `http://localhost:3000`; no environment variables/secrets. Modern browser with Service Workers, IndexedDB, Web Crypto on localhost/HTTPS.
 
-## Fictional demo authentication
+| Fictional user | Email                    | Public demo password | Role   |
+| -------------- | ------------------------ | -------------------- | ------ |
+| River Vale     | river.vale@example.test  | Fictional-pass-42    | Admin  |
+| Sage Linden    | sage.linden@example.test | Fictional-pass-42    | Member |
 
-| Fictional user | Email                    | Demo password     | Role   |
-| -------------- | ------------------------ | ----------------- | ------ |
-| River Vale     | river.vale@example.test  | Fictional-pass-42 | Admin  |
-| Sage Linden    | sage.linden@example.test | Fictional-pass-42 | Member |
+Orbit Workshop is fictional. **Never enter real passwords or incident data.** Registration creates a browser-stored fictional account; recovery sends no email. River is the recommended reviewer identity.
 
-Workspace: **Orbit Workshop**. These are public, fictional demo credentials, not real accounts. Never enter a real password. Registration creates a fictional active member of this workspace. Forgot password simulates a request only and sends no email.
+## What to try
 
-MSW simulates authentication in both development and production preview. A public cookie correlates the browser with the fictional IndexedDB authority; it is not a secure token. Authority records contain public profiles, fictional verification digests and expiring leases, never submitted raw passwords or bearer/refresh tokens. This is **not production authentication/security**. Registered accounts and sessions survive reload while browser storage remains available. Access expires after five minutes; refresh eligibility lasts one day. Explicit logout removes the active client lease/cookie and visible identity cache, not shared fictional accounts.
+1. **INC-2841:** virtual variable-height Timeline, older pages, message via Ctrl/Cmd+Enter. Enter inserts newline; confirmation reconciles one optimistic item.
+2. Same room in another same-origin tab: confirmed activity converges through independent mock transports. Draft/outbox are identity-scoped; no client leader election or connection sharing.
+3. Recent Thread, or `/app/incidents/INC-2841?thread=fictional-incident-2841:evt-42` for the old 2k discussion. Targets use locator/windows, not full-history paging.
+4. Search `Aurora`, follow an exact message/Thread target; Ctrl/Cmd+K outside editable fields. Inbox has an independent unread summary.
+5. **INC-2865** Postmortem: River initiates, Sage participant edits. Two clients demonstrate stale Save/conflict/review/reload. INC-2845 gives Sage read-only access. Action assignment/date/status has independent revisions.
+6. Expand **Demo Mode** above the product surface. Close other app tabs before destructive maintenance.
 
-Open `/app/incidents` to browse 32 deterministic fictional incidents. Filter status/severity, assignment, active participants and inclusive UTC creation dates; sort by update, creation or severity. Controls live in the URL and preserve refresh/back/forward. Load more retrieves at most 12 incidents at a time. My Incidents is the same list filtered by your stable user ID.
+## Demo Mode
 
-Active members and admins can create incidents. The responsive dialog uses a full-screen mobile surface; entered values and errors survive resizing. The creator becomes commander and participant, with Triggered status. Title is required (160 characters max); description is optional (4000 max); services and additional participants are optional. Dirty close asks for confirmation. Creation requires an online mock response, with no automatic retry or optimistic outbox. An ambiguous network failure retains/locks the submitted values and lets you retry the same idempotent submission. Confirmed incidents survive reload in the shared fictional IndexedDB authority. Clear browser site data to restore original fixtures; no product reset button is exposed.
+Collapsed, clearly fictional developer controls, separate from commander permissions. Validated Redux configuration feeds mock HTTP scheduling and registered **existing** realtime coordinator capabilities; features do not branch on demo flags.
 
-`/app/incidents/INC-2841` opens a real Incident Room with 4,000 deterministic fictional entries. Other seeded incidents have 160 entries; newly created incidents start genuinely empty. Desktop keeps context beside the primary Timeline; mobile condenses context into expandable details. Load older history preserves the reading anchor. `?event=fictional-incident-2841%3Aevt-20` locates an old tombstone through a bounded target window without paging through all history; unknown query parameters/hash remain intact. Target errors leave the room usable with Retry and Go to latest.
+- **Latency:** 0/500/2,000/5,000 ms before ordinary mock reads/mutations. Real Search/loading/background requests and optimistic delivery. Authentication, realtime polling and Demo requests are exempt to keep recovery usable.
+- **Failures:** 0/10/30%, operation-local method+pathname counters restarted on applying configuration. First 1/3 of each ten operations fail **before persistence**; no random test flakes. Query safe-read retry may succeed next slot. Existing fixtures separately test after-persistence ambiguity; this control does not fake it.
+- **Disconnect/reconnect:** actual coordinator Offline/recovery, preserved history/local work, journal resync before Connected. Disconnect → generate → reconnect shows missed changes.
+- **Generate:** monitoring, deployment, human message (eligible fictional peer when available), authorized forward status change. Current Incident, default INC-2841 elsewhere; authority source changes/journal/recipient notifications, never fabricated client rows. Resolved forbids operational generation; status CAS rejects stale concurrent transitions.
+- **Stress size:** confirm INC-2841 replacement with 100/1k/10k/50k existing deterministic generator entries. Clears room Threads, workspace journal and **all identities' local drafts/outbox** to avoid orphan work. Other Incidents/notifications/Postmortems remain; old notification targets may be unavailable. Reload establishes fresh windows/checkpoints and default simulation.
+- **Reset:** confirm → exclusive maintenance lease (close other app tabs) → session/runtime/local-work drain → finish in-flight mock requests → clear all eight known fictional/local stores → fresh login/seed. Removes fictional accounts/leases, created Incidents, Timeline/Threads, Notifications, Postmortems/Actions, all drafts/outbox. Lazy default seeds restore on read. No raw database deletion from UI or clearing unrelated origin storage. Cross-database maintenance is not globally atomic; on storage failure reload/check storage and retry reset before trusting partial state.
+- **Clear simulations:** config only, no persistent deletion. Configuration is tab-local and resets on full reload.
 
-Participants, commander and admins may compose on active incidents. Resolved/nonparticipant rooms remain readable. Messages are plain text up to 4,000 characters; Enter inserts a newline, Ctrl/Cmd+Enter sends (not during IME), and a visible Send button is available. Mention selects an active workspace person and inserts readable text with their stable ID; no rich text or mention-popup editor. Only safe HTTP(S) URLs become links.
+Fixed fixture seed: INC-2841 IDs `evt-N`, September 2026 logical timestamps, deterministic mixed types/bodies. Generated event IDs/order derive from the authority counter and logical time follows latest confirmed activity. Status audit time uses authority time. This is reproducibility, not a benchmark guarantee.
 
-Native IndexedDB stores identity/incident-scoped drafts and outbox separately from fictional server authority data. Drafts debounce for 250ms and flush on navigation/pagehide; the last uncommitted keystrokes cannot be guaranteed after an abrupt browser/process crash. Send atomically persists the outbox and clears its draft before clearing the editor or dispatching HTTP. Storage failure keeps editor text. Unknown transport outcomes are checked by mutation ID before any explicit Retry; reload never blindly resends. Explicit logout deletes this identity's local work; expiry/switch quarantine it. There is no offline-first/background delivery or cross-tab local coordination.
+## Architecture worth discussing
 
-Other future-feature destinations remain placeholders. Authentication preserves safe `/app/` return paths including query/hash; external/malformed returns fall back to `/app/incidents`. A full navigation crosses the auth boundary intentionally; in-app navigation uses Next.js.
+- **Query vs Redux:** validated confirmed resources/windows in identity-scoped Query keys; serializable session/connection/local mutation metadata and small Demo settings in Redux. Services outside Redux, forms/dialogs local, filters/targets URL-owned.
+- **Local work:** native IndexedDB draft→outbox handoff is atomic before clearing input. Stable UUID survives Retry; ambiguous outcome checks authority before resending. Logout drains/deletes matching identity; different users cannot activate its work.
+- **Realtime:** independent polling behind a replaceable WebSocket-style port. Durable source → idempotent retained journal → acknowledgment. Checkpoint follows successful merge, not arrival. Reconnect buffers/syncs through a fixed boundary/dedupes then Connected; expired history uses bounded snapshots.
+- **Virtual navigation:** measured streams, keyed anchors, focused-row pinning, sparse target windows, cancellable readiness. DOM bounded; acquired histories still consume memory. Thread/ephemeral updates do not rebuild Timeline history.
+- **Postmortem:** explicit revision CAS, clean fields adopt remote state, dirty fields remain local. Review/reload retains transient reference copy; Action revisions independent. No autosave/CRDT/approval/publish.
+- **Fictional server vs local work:** canonical authorities/journal have separate databases from draft/outbox; not persisted Query cache or production security.
 
-## Threads
+`src/app` composes `features → entities → shared`. [Technical Architecture](docs/technical-architecture.md), immutable [Product Specification](docs/product-spec.md), [final requirement/a11y/performance audit](docs/portfolio-audit.md).
 
-Each confirmed Timeline entry has a contextual discussion action. Opening an empty Thread does not persist a resource: its first confirmed reply creates exactly one Thread for that root. All replies share one chronological level; Reply sets a stable contextual message reference, never a child list. Cancel reply retains body text. Deleted parents/roots show semantic placeholders without removed content.
+## Actual stack
 
-Desktop keeps Timeline usable beside the Thread. Mobile uses a dedicated full-screen surface, with Back/Close, focus containment and keyboard-safe scroll/compose. Resizing preserves the same Thread component, draft, reply target and navigation generation. Browser history opens/closes the URL-owned surface; explicit View root in Timeline uses the existing Timeline locator and target coordinator.
+Next 16.3.8, React 19.3, strict TS 5.9, RTK 2.13/react-redux 9, Query 5, Virtual 3, RHF 7, Zod 4, Tailwind 4, MSW 2. Native HTML dialogs/Service Workers/IndexedDB/Web Crypto/AbortController/ResizeObserver. No Radix/shadcn, icon/animation package, Socket.IO or real WebSocket server installed.
 
-Canonical links follow the accepted specification: `?thread=<rootTimelineEntryId>&message=<threadMessageId>`. Existing `event`, unrelated parameters and hash are preserved. An event target controls only Timeline navigation; Thread root resolution does not itself scroll Timeline. Message/reference targets use a locator and bounded window, not linear pagination. For example, `/app/incidents/INC-2841?thread=fictional-incident-2841%3Aevt-42&message=fictional-incident-2841%3Areply-42-800` opens a large old discussion. Root evt-4000 starts with eight replies; evt-42 starts with 2,000 independently fictional replies.
-
-History pages contain at most 60 messages; target windows at most 51. One measured virtual stream merges Query history/target/acknowledgment resources and durable local records using revisions and author+mutation aliases. Older pages preserve the reading anchor; replies follow only near newest, otherwise New replies appears. Summaries contain absolute confirmed count, participants and activity; duplicate events cannot increment them.
-
-Thread drafts include body and reply target, scoped by user/workspace/incident/root in the existing `incident-room-local-work-v1` database. Send atomically moves both to the existing outbox before clearing the editor. Unknown outcomes are looked up before explicit same-UUID retry; reload does not resend. Logout clears all local work for that identity. Abrupt-crash limits are the same as Timeline's debounced drafts.
-
-Thread messages and summaries extend the existing persistent journal and one room transport/resync runtime. Closed Thread histories are marked stale without eager fetching. Expired checkpoints repair only the active Thread's recent/already loaded messages plus the Timeline resources. Thread typing uses the existing ephemeral broker, scoped by root and distinct from Timeline typing; presence remains incident-wide. No new dependencies or second local persistence system were introduced.
-
-## Search, Notifications and Command Palette
-
-Global Search is directly reachable in the authenticated navigation. Two trimmed characters start a 200ms-debounced query; query/type live in the URL and changing them resets pagination. Initial pages contain at most ten results per type, Load more is explicit, snippets are plain text with safe React highlights. Ranking is deterministic, not production-grade: exact matches, phrase matches and all-token matches, then recency and stable ID. Incident numbers/titles receive extra weight. Search reads fictional authority data, not downloaded histories or drafts; refresh explicitly reruns the query. Timeline/Thread results use the existing locator/window/highlight contracts, including old targets and unavailable/deleted states. User results include initials avatars and open a read-only workspace profile with the existing participant-filter destination; editing profiles remains outside this phase.
-
-Activity Inbox contains recipient-owned persistent notifications for assignment, relevant severity/status changes, mentions and contextual replies. The actor is excluded; active workspace users alone are eligible. Inbox pages contain at most twenty items. Unread count is an independently queried absolute revisioned value, not a sum of downloaded pages. Mark read/unread and one bulk Mark all as read operation are authority-confirmed and idempotent. Activation attempts mark-read before canonical navigation; failure leaves read state unchanged, permits navigation and shows a persistent dismissible retry notice. Notifications use the same workspace sequence, duplicate/revision guards and reconnect/resync; foreign-recipient events are replaced with content-free checkpoints. No email, browser push, second transport or separate reconnect loop exists.
-
-Commands opens the native dialog on desktop and mobile; mobile Thread has its own visible trigger. Cmd/Ctrl+K does not intercept editable inputs, IME or another modal. Arrow keys select, Enter activates, Escape closes and focus returns to the trigger where available. Static commands filter locally; Incident lookup returns at most five authority results. Create Incident and Close Thread call existing app ports, including draft flush/dirty-close safeguards. No destructive business commands were added.
-
-## Realtime simulation
-
-Open two tabs in the same browser profile/origin and the same incident. Each tab owns an independent authenticated transport and checkpoint; a confirmed message appears in the other without refreshing. The deterministic mock adapter polls a shared fictional-server IndexedDB journal every 500ms; it implements WebSocket-style lifecycle behind a replaceable port, not an actual network WebSocket or production server. Separate browser profiles/contexts have separate fictional-server storage and do not share a backend.
-
-Transport connection does not imply synchronization: Connecting/Reconnecting remains visible until authoritative recovery completes. Browser offline is a hint; old confirmed content and durable local work remain readable. Online recovery fetches missed persistent changes, buffers live events, merges revisions and only then reports Connected. Expired checkpoints refresh bounded recent/loaded-entry snapshots without clearing draft/outbox or reloading the app. Retry connection is explicit; mutation retries remain user-driven.
-
-Room presence and rate-limited typing use a separate Service Worker's **in-memory fictional-server** lease registry, never persistent storage or Timeline events. Departure/disconnect removes the lease; abandoned leases expire and worker restart rebuilds from active heartbeats. This is no cross-tab socket sharing, leader election or direct client messaging. Each client reads server snapshots; no BroadcastChannel/SharedWorker is used. The list watches workspace metadata without joining incident presence. New updates counts distinct newly confirmed entries while reading older history, preserving the anchor and active deep link until explicitly returning to latest.
-
-## Validation
+## Quality and screenshots
 
 ```sh
 pnpm format:check
@@ -90,16 +70,28 @@ pnpm test
 pnpm build
 pnpm exec playwright install chromium
 pnpm test:e2e
+git diff --check
 ```
 
-`pnpm format` applies formatting, and `pnpm test:watch` runs unit/component tests interactively. Playwright starts the production application on port 3100; run `pnpm build` first. `pnpm start` serves an existing production build.
+Vitest: domain ordering/policy/CAS, persistence/delivery races, HTTP/session integration, journal/cache recovery, React keyboard/error/conflicts. Playwright: production `next start`, desktop/mobile, identity isolation, independent clients, recovery/expiry, old targets/anchors, safe content/inbox and large-history DOM. Native fictional IndexedDB. `pnpm start` serves an existing build.
 
-## Stack and scope
+Known Windows six-worker full-suite timeouts affect old realtime/Thread startup/resync and reproduced on Phase 7 baseline. Phase 8 CI #9 passed with two workers, zero actual retries. Supported local diagnostic: `pnpm exec playwright test --workers=2 --retries=0`; normal CI unchanged (two workers, one configured retry). Green supported runs are not a claimed six-worker success. [Audit](docs/portfolio-audit.md) records this; no assertion/timeout/config weakening.
 
-React 19, Next.js, TypeScript, Redux Toolkit, TanStack Query, React Hook Form, Zod, WebSocket, TanStack Virtual, Tailwind CSS, Radix UI / shadcn/ui, MSW, IndexedDB where appropriate, Vitest, React Testing Library, Playwright, and GitHub Actions.
+Deterministic screenshot workflow (no bulky committed binaries):
 
-React/Next.js, Redux, Query, Tailwind, RHF/Zod forms, MSW auth/incident/Timeline authorities, TanStack Virtual, native IndexedDB, Vitest/Testing Library, Playwright and CI are configured. Confirmed resources belong to Query; Redux stores serializable session/connection and local mutation coordination metadata, never confirmed Timeline content. Central semantic policy governs both UI and authority. Session lifecycle now stops local work and integrates durable logout cleanup with the existing retry barrier. The creation surface uses native HTML dialog; no Radix/shadcn package is installed.
+```sh
+pnpm build
+pnpm exec playwright test tests/e2e/demo.spec.ts --grep "reviewer showcase" --project desktop-chromium --workers=1 --retries=0
+pnpm exec playwright show-report
+```
 
-HTTP/session integration tests inject authority/clock to trigger expiry deterministically. Realtime tests cover validation, checkpoint commits, duplicates/revisions/tombstones, cancellation/deadlines, backoff, buffering and journal retention. Browser suites exercise multi-client live delivery, reconnect/resync, dropped/duplicate/reversed delivery, optimistic echo before HTTP, expired snapshots, presence/typing, metadata convergence and target/old-reader preservation alongside earlier auth/Timeline regressions. A real 10,000-row projection has a bounded DOM in component tests; the browser also checks a 10,000-entry authority dataset. The generator supports 50,000 without loading that size by default. Fault/latency injection edits internal test-fixture IndexedDB records only: no test endpoint, product control or window global. No fragile FPS benchmarks. Tests isolate storage; multi-client cases deliberately share one fictional server through independent pages in one browser context.
+Showcase attaches six app-only PNGs: list, Timeline, Thread, Search, Demo and Postmortem. Fresh context/fixed seed; desktop begins 1280×720, Demo/Postmortem 1280×900 after responsive checks. No private browser/devtools data; ignored test-results/report attachments, not visual-regression baselines.
 
-This is an independent clean-room project. No private commercial source or real incident data is used.
+## Honest boundaries
+
+- Mock auth/backend/polling; no shared remote server/security/production persistence/OAuth/integrations/AI/billing/analytics/attachments/rich text/offline background delivery.
+- Same-origin tabs share fictional authority; profiles/devices do not. Destructive Demo maintenance needs Web Locks and other app tabs closed.
+- Substantial accepted gap: ordinary commander status/severity/participant/transfer/important-marking UI and its full audit command subsystem absent. Demo is not a substitute. Settings documents browser preferences rather than an account preferences backend. Explicit [requirement audit](docs/portfolio-audit.md), not a hidden completion claim.
+- Postmortem fields transient; same-document Back/Forward lacks global dirty-work interception. App links/commands/sign-out/native reload/close warn. Phase 8 task explicitly added structured Action assignment/date/status without changing accepted spec.
+- Whole-bucket mock scans/validation and acquired Query windows limit stress scale. No FPS/security/WCAG certification claim. Remote HTTPS smoke and assistive-device matrix remain owner checks.
+- No license selected; owner decision. Clean-room fictional data only; no private commercial repository inspected/reused.

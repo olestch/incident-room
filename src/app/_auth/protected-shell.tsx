@@ -8,6 +8,7 @@ import type { SessionIdentity } from '@/features/session/session-model';
 import { safeReturnDestination } from '@/features/session/return-destination';
 import { CommandsProvider } from '@/app/_discovery/commands-context';
 import { DiscoveryControls } from '@/app/_discovery/discovery-controls';
+import { DemoControls } from '@/app/_demo/controls';
 import { useCommands } from '@/app/_discovery/commands-context';
 import {
   SessionIssue,
@@ -138,6 +139,7 @@ function IdentityShellContent({
           </button>
         </div>
       )}
+      <DemoControls />
       <main
         id="main-content"
         tabIndex={-1}

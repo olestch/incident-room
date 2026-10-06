@@ -54,9 +54,17 @@
 }
 
 body {
+  color-scheme: light;
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+@media (forced-colors: active) {
+  .timeline-target,
+  .command-selected {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 .timeline-viewport {
   height: min(58dvh, 42rem);
