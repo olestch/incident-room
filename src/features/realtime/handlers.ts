@@ -4,6 +4,7 @@ import { canCreateIncident, type IncidentActor } from '@/entities/incident/polic
 import type { Incident } from '@/entities/incident/model';
 import { AppError } from '@/shared/errors/app-error';
 import type { EventJournal } from './journal';
+import { recipientSync } from './protocol';
 
 export function realtimeHandlers(
   journal: EventJournal,
@@ -76,17 +77,23 @@ export function realtimeHandlers(
     http.get(
       `${root}/sync`,
       handle(async (url, actor) =>
-        journal.read(
-          actor.workspaceId,
-          sequence(url.searchParams.get('after')),
-          sequence(url.searchParams.get('boundary')),
+        recipientSync(
+          await journal.read(
+            actor.workspaceId,
+            sequence(url.searchParams.get('after')),
+            sequence(url.searchParams.get('boundary')),
+          ),
+          actor.id,
         ),
       ),
     ),
     http.get(
       `${root}/stream`,
       handle(async (url, actor) => ({
-        ...(await journal.read(actor.workspaceId, sequence(url.searchParams.get('after')))),
+        ...recipientSync(
+          await journal.read(actor.workspaceId, sequence(url.searchParams.get('after'))),
+          actor.id,
+        ),
         controls: await journal.controls(actor.workspaceId, url.searchParams.get('client') ?? ''),
       })),
     ),
@@ -154,17 +161,23 @@ export function workspaceRealtimeHandlers(
     http.get(
       `${root}/stream`,
       handle(async (url, actor) => ({
-        ...(await journal.read(actor.workspaceId, seq(url.searchParams.get('after')))),
+        ...recipientSync(
+          await journal.read(actor.workspaceId, seq(url.searchParams.get('after'))),
+          actor.id,
+        ),
         controls: await journal.controls(actor.workspaceId, url.searchParams.get('client') ?? ''),
       })),
     ),
     http.get(
       `${root}/sync`,
       handle(async (url, actor) =>
-        journal.read(
-          actor.workspaceId,
-          seq(url.searchParams.get('after')),
-          seq(url.searchParams.get('boundary')),
+        recipientSync(
+          await journal.read(
+            actor.workspaceId,
+            seq(url.searchParams.get('after')),
+            seq(url.searchParams.get('boundary')),
+          ),
+          actor.id,
         ),
       ),
     ),

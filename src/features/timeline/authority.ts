@@ -17,6 +17,15 @@ export const authorityDataSchema = z.object({
   fault: z.enum(['none', 'reject-once', 'ambiguous-once', 'missing-once']).default('none'),
   responseDelayMs: z.number().int().min(0).max(5000).default(0),
   locateDelayMs: z.number().int().min(0).max(5000).default(0),
+  searchControls: z
+    .object({
+      delayMs: z.number().min(0).max(5000).default(0),
+      failOnce: z.boolean().default(false),
+      failuresRemaining: z.number().int().min(0).max(10).default(0),
+      started: z.number().int().nonnegative().default(0),
+      completed: z.number().int().nonnegative().default(0),
+    })
+    .default({ delayMs: 0, failOnce: false, failuresRemaining: 0, started: 0, completed: 0 }),
   changes: z
     .array(
       z.object({
@@ -38,6 +47,7 @@ export function seedTimeline(key: string): AuthorityData {
     fault: 'none',
     responseDelayMs: 0,
     locateDelayMs: 0,
+    searchControls: { delayMs: 0, failOnce: false, failuresRemaining: 0, started: 0, completed: 0 },
     changes: [],
   };
 }
@@ -67,6 +77,33 @@ export class MockTimelineAuthority {
     private readonly store: AtomicStore<AuthorityData>,
     private readonly now = Date.now,
   ) {}
+  inspectSearchable<T>(
+    actor: IncidentActor,
+    incident: Incident,
+    inspect: (entries: readonly TimelineEntry[]) => T,
+  ) {
+    return this.store.transact(this.room(actor, incident), (data) => inspect(data.entries));
+  }
+  searchPolicy(actor: IncidentActor, incident: Incident) {
+    return this.store.transact(this.room(actor, incident), (data) => {
+      const policy = {
+        delayMs: data.searchControls.delayMs,
+        fail: data.searchControls.failOnce || data.searchControls.failuresRemaining > 0,
+      };
+      data.searchControls.failOnce = false;
+      data.searchControls.failuresRemaining = Math.max(
+        0,
+        data.searchControls.failuresRemaining - 1,
+      );
+      data.searchControls.started++;
+      return policy;
+    });
+  }
+  completeSearch(actor: IncidentActor, incident: Incident) {
+    return this.store.transact(this.room(actor, incident), (data) => {
+      data.searchControls.completed++;
+    });
+  }
   private room(actor: IncidentActor, incident: Incident) {
     if (!canViewIncident(actor, incident))
       throw new AppError('authorization', 'Access denied.', 403);

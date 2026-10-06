@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { currentUserKey } from '@/entities/current-user/model';
 import type { SessionIdentity } from '@/features/session/session-model';
 import { safeReturnDestination } from '@/features/session/return-destination';
+import { CommandsProvider } from '@/app/_discovery/commands-context';
+import { DiscoveryControls } from '@/app/_discovery/discovery-controls';
 import {
   SessionIssue,
   SessionProgress,
@@ -47,6 +49,19 @@ export function ProtectedShell({ children }: { children: ReactNode }) {
   );
 }
 function IdentityShell({ identity, children }: { identity: SessionIdentity; children: ReactNode }) {
+  return (
+    <CommandsProvider>
+      <IdentityShellContent identity={identity}>{children}</IdentityShellContent>
+    </CommandsProvider>
+  );
+}
+function IdentityShellContent({
+  identity,
+  children,
+}: {
+  identity: SessionIdentity;
+  children: ReactNode;
+}) {
   const { coordinator, adapter, state } = useSessionRuntime();
   const pathname = usePathname();
   const router = useRouter();
@@ -65,6 +80,7 @@ function IdentityShell({ identity, children }: { identity: SessionIdentity; chil
           Incident Room
         </Link>
         <div className="flex flex-wrap items-center gap-4">
+          <DiscoveryControls userId={identity.userId} workspaceId={identity.workspaceId} />
           {current.data && (
             <p aria-label="Current user">
               {current.data.name} <span className="text-sm text-muted">({current.data.role})</span>

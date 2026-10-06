@@ -10,6 +10,7 @@ export function threadHandlers(
   authenticate: (client: string) => Promise<IncidentActor>,
   incident: (actor: IncidentActor, number: string) => Promise<Incident>,
   activity: (actor: IncidentActor, number: string, time: string) => Promise<void>,
+  persisted: (actor: IncidentActor, record: Incident) => Promise<void> = async () => {},
 ) {
   const handle =
     (
@@ -98,7 +99,9 @@ export function threadHandlers(
     http.post(
       `${base}/:root/messages`,
       handle(async (request, actor, record, root) => {
-        const entry = await authority.create(actor, record, root, await request.json());
+        const entry = await authority.create(actor, record, root, await request.json(), () =>
+          persisted(actor, record),
+        );
         await activity(actor, record.number, entry.createdAt);
         return entry;
       }),

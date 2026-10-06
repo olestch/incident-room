@@ -10,7 +10,15 @@ import { timelineHandlers } from '@/features/timeline/handlers';
 import { MockThreadAuthority, makeThreadAuthorityStore } from '@/features/threads/authority';
 import { threadHandlers } from '@/features/threads/handlers';
 import { EventJournal, makeJournalStore } from '@/features/realtime/journal';
-import { composeRealtimeAuthority } from './realtime-authority';
+import { composeRealtimeAuthority, ingestRoomChanges } from './realtime-authority';
+import {
+  MockNotificationAuthority,
+  makeNotificationStore,
+} from '@/features/notifications/authority';
+import { notificationHandlers } from '@/features/notifications/handlers';
+import { composeNotificationIngestion } from './notification-ingestion';
+import { composeSearchAuthority } from './search-authority';
+import { searchHandlers } from '@/features/search/handlers';
 
 let startup: Promise<void> | null = null;
 export function startMock() {
@@ -30,7 +38,33 @@ export function startMock() {
         await timeline.locate(actor, incident, root);
       },
     );
+    const notifications = new MockNotificationAuthority(makeNotificationStore());
+    const notificationIngestion = composeNotificationIngestion(
+      notifications,
+      journal,
+      () => auth.users(),
+      threads,
+      timeline,
+    );
+    const persistRoom = async (
+      actor: Parameters<typeof ingestRoomChanges>[4],
+      record: Parameters<typeof ingestRoomChanges>[5],
+    ) =>
+      ingestRoomChanges(
+        journal,
+        incidents,
+        timeline,
+        threads,
+        actor,
+        record,
+        notificationIngestion,
+      );
     const worker = setupWorker(
+      ...notificationHandlers(notifications, authenticate, notificationIngestion.publish),
+      ...searchHandlers(
+        composeSearchAuthority(incidents, timeline, threads, () => auth.users()),
+        authenticate,
+      ),
       ...authHandlers(auth),
       ...incidentHandlers(
         incidents,
@@ -49,13 +83,17 @@ export function startMock() {
           return session.user;
         },
         (actor, number) => incidents.detail(actor, number),
-        (actor, number, time) => incidents.recordActivity(actor, number, time),
+        async (actor, number, time) => {
+          await incidents.recordActivity(actor, number, time);
+          await persistRoom(actor, await incidents.detail(actor, number));
+        },
       ),
       ...threadHandlers(
         threads,
         authenticate,
         (actor, number) => incidents.detail(actor, number),
         (actor, number, time) => incidents.recordActivity(actor, number, time),
+        persistRoom,
       ),
       ...composeRealtimeAuthority(
         journal,
@@ -67,6 +105,7 @@ export function startMock() {
           return session.user;
         },
         threads,
+        notificationIngestion,
       ),
     );
     startup = worker

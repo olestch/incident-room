@@ -7,6 +7,8 @@ import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { RealtimeCoordinator } from '@/features/realtime/coordinator';
 import { MockRealtimeTransport } from '@/features/realtime/mock-transport';
 import { openSchema, streamSchema, syncSchema } from '@/features/realtime/protocol';
+import { notificationKeys } from '@/entities/notification/model';
+import { applyNotification } from '@/app/_discovery/notification-cache';
 
 /** The authorized list watches workspace metadata only, with no incident presence subscription. */
 export function useListRealtime(enabled: boolean, userId: string, workspaceId: string) {
@@ -40,6 +42,7 @@ export function useListRealtime(enabled: boolean, userId: string, workspaceId: s
       sync: (after, boundary, signal) =>
         read(`/sync?after=${after}&boundary=${boundary}`, syncSchema, signal),
       snapshot: async (signal) => {
+        await cache.invalidateQueries({ queryKey: notificationKeys.all(userId, workspaceId) });
         await cache.invalidateQueries({ queryKey: incidentKeys.all(userId, workspaceId) });
         signal.throwIfAborted();
         if (!valid()) throw new DOMException('Superseded identity', 'AbortError');
@@ -49,6 +52,17 @@ export function useListRealtime(enabled: boolean, userId: string, workspaceId: s
       apply: async (event, signal) => {
         signal.throwIfAborted();
         if (!valid()) throw new DOMException('Superseded identity', 'AbortError');
+        if (event.resourceType === 'notification') {
+          if (event.payload.notification.recipientUserId === userId)
+            applyNotification(
+              cache,
+              userId,
+              workspaceId,
+              event.payload.notification,
+              event.payload.unread,
+            );
+          return;
+        }
         if (event.resourceType !== 'incident') return;
         cache.setQueryData<Incident>(
           incidentKeys.detail(userId, workspaceId, event.payload.number),

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { incidentSchema } from '@/entities/incident/model';
+import { notificationChangeSchema } from '@/entities/notification/model';
 import { timelineEntrySchema, timelineWindowSchema } from '@/entities/timeline/model';
 import {
   threadSchema,
@@ -18,6 +19,18 @@ const base = {
 };
 export const persistentEventSchema = z
   .discriminatedUnion('resourceType', [
+    z.object({
+      ...base,
+      resourceType: z.literal('notification'),
+      kind: z.literal('notification_updated'),
+      payload: notificationChangeSchema,
+    }),
+    z.object({
+      ...base,
+      resourceType: z.literal('checkpoint'),
+      kind: z.literal('checkpoint'),
+      payload: z.object({ id: z.string(), revision: z.number().int().positive() }),
+    }),
     z.object({
       ...base,
       resourceType: z.literal('incident'),
@@ -52,12 +65,19 @@ export const persistentEventSchema = z
   ])
   .refine(
     (event) =>
-      event.resourceId === event.payload.id &&
-      event.revision === event.payload.revision &&
-      (event.resourceType === 'incident'
-        ? event.workspaceId === event.payload.workspaceId
-        : event.incidentId === event.payload.incidentId &&
-          (event.resourceType === 'timeline' || event.workspaceId === event.payload.workspaceId)),
+      event.resourceType === 'notification'
+        ? event.resourceId === event.payload.notification.id &&
+          event.revision === event.payload.notification.revision &&
+          event.workspaceId === event.payload.notification.workspaceId
+        : event.resourceId === event.payload.id &&
+          event.revision === event.payload.revision &&
+          (event.resourceType === 'checkpoint'
+            ? true
+            : event.resourceType === 'incident'
+              ? event.workspaceId === event.payload.workspaceId
+              : event.incidentId === event.payload.incidentId &&
+                (event.resourceType === 'timeline' ||
+                  event.workspaceId === event.payload.workspaceId)),
     'Envelope/resource mismatch',
   );
 export type PersistentEvent = z.infer<typeof persistentEventSchema>;
@@ -83,6 +103,27 @@ export const syncSchema = z.object({
   expired: z.boolean(),
 });
 export type SyncResult = z.infer<typeof syncSchema>;
+/** Preserve contiguous journal sequence without disclosing another recipient's resource. */
+export function recipientSync(result: SyncResult, userId: string): SyncResult {
+  return {
+    ...result,
+    events: result.events.map((event) =>
+      event.resourceType === 'notification' && event.payload.notification.recipientUserId !== userId
+        ? {
+            eventId: `checkpoint:${event.sequence}`,
+            workspaceId: event.workspaceId,
+            sequence: event.sequence,
+            resourceId: `checkpoint:${event.sequence}`,
+            revision: 1,
+            occurredAt: '1970-01-01T00:00:00.000Z',
+            resourceType: 'checkpoint' as const,
+            kind: 'checkpoint' as const,
+            payload: { id: `checkpoint:${event.sequence}`, revision: 1 },
+          }
+        : event,
+    ),
+  };
+}
 export const snapshotSchema = z
   .object({
     incident: incidentSchema,

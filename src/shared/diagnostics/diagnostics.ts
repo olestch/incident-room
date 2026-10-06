@@ -13,7 +13,14 @@ export type DiagnosticEvent =
   | 'duplicate_event'
   | 'stale_revision'
   | 'invalid_event'
-  | 'checkpoint_advanced';
+  | 'checkpoint_advanced'
+  | 'search_requested'
+  | 'search_failed'
+  | 'notification_received'
+  | 'notification_read'
+  | 'notification_bulk_read'
+  | 'command_palette_opened'
+  | 'command_executed';
 // Realtime categories contain no content or identity fields.
 
 export interface DiagnosticRecord {

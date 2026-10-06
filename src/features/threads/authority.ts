@@ -8,6 +8,7 @@ import {
   rootIdSchema,
   compareMessages,
   type Thread,
+  type ThreadMessage,
 } from '@/entities/thread/model';
 import { AppError } from '@/shared/errors/app-error';
 import { IndexedDbAtomicStore, type AtomicStore } from '@/shared/persistence/atomic-store';
@@ -137,6 +138,27 @@ export class MockThreadAuthority {
     ) => Promise<void>,
     private readonly now = Date.now,
   ) {}
+  async inspectSearchable(
+    actor: IncidentActor,
+    incident: Incident,
+    inspect: (message: ThreadMessage) => void,
+  ) {
+    if (!canViewIncident(actor, incident))
+      throw new AppError('authorization', 'Access denied.', 403);
+    await this.store.transact(JSON.stringify([incident.workspaceId, incident.id]), (data) => {
+      for (const [root, count] of Object.entries(data.fixtureCounts)) {
+        for (const message of generateThreadFixture(
+          incident.workspaceId,
+          incident.id,
+          Number(root.split('-').at(-1)),
+          count,
+        ))
+          inspect(message);
+      }
+      for (const messages of Object.values(data.messages))
+        for (const message of messages) inspect(message);
+    });
+  }
   private materialize(data: ThreadAuthorityData, incident: Incident, root: string) {
     const count = data.fixtureCounts[root];
     if (count !== undefined) {
@@ -216,7 +238,13 @@ export class MockThreadAuthority {
       return entry ? { status: 'found' as const, entry } : { status: 'missing' as const };
     });
   }
-  async create(actor: IncidentActor, incident: Incident, root: string, raw: unknown) {
+  async create(
+    actor: IncidentActor,
+    incident: Incident,
+    root: string,
+    raw: unknown,
+    persisted: () => Promise<void> = async () => {},
+  ) {
     const input = createReplySchema.parse(raw);
     const room = await this.resource(actor, incident, root);
     if (!canWriteIncident(actor, incident))
@@ -290,6 +318,7 @@ export class MockThreadAuthority {
       });
       return { entry, ambiguous: fault === 'ambiguous-once', delay: data.responseDelayMs };
     });
+    if (result.entry) await persisted();
     if (result.delay) await new Promise((resolve) => setTimeout(resolve, result.delay));
     if (result.ambiguous) throw new AppError('network', 'Thread mutation outcome unknown.', 503);
     if (!result.entry)
@@ -299,6 +328,13 @@ export class MockThreadAuthority {
         422,
       );
     return result.entry;
+  }
+  notificationRecipients(actor: IncidentActor, incident: Incident, root: string) {
+    if (!canViewIncident(actor, incident))
+      throw new AppError('authorization', 'Access denied.', 403);
+    return this.store.transact(JSON.stringify([incident.workspaceId, incident.id]), (data) => [
+      ...new Set(this.materialize(data, incident, root).map((message) => message.authorId)),
+    ]);
   }
   private refreshSummary(data: ThreadAuthorityData, incident: Incident, root: string) {
     const messages = data.messages[root]!;

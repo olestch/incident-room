@@ -1,4 +1,6 @@
 'use client';
+import { applyNotification } from '@/app/_discovery/notification-cache';
+import { notificationKeys } from '@/entities/notification/model';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   threadKeys,
@@ -145,6 +147,18 @@ export function useRoomRealtime(
       apply: async (event, signal) => {
         signal.throwIfAborted();
         if (!valid()) throw new DOMException('Room disposed', 'AbortError');
+        if (event.resourceType === 'notification') {
+          if (event.payload.notification.recipientUserId === actor.id)
+            applyNotification(
+              cache,
+              actor.id,
+              actor.workspaceId,
+              event.payload.notification,
+              event.payload.unread,
+            );
+          return;
+        }
+        if (event.resourceType === 'checkpoint') return;
         if (event.resourceType === 'incident') {
           const key = incidentKeys.detail(actor.id, actor.workspaceId, event.payload.number);
           cache.setQueryData<Incident>(key, (previous) =>
@@ -220,6 +234,9 @@ export function useRoomRealtime(
         }
       },
       snapshot: async (signal) => {
+        await cache.invalidateQueries({
+          queryKey: notificationKeys.all(actor.id, actor.workspaceId),
+        });
         const activeThread = threadPort?.current;
         const ids = [
           ...new Set(

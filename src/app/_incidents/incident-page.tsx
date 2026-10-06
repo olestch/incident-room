@@ -36,7 +36,7 @@ import {
 import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { AppError } from '@/shared/errors/app-error';
 import { TimelineRoom } from './timeline-room';
-import { useListRealtime } from './use-list-realtime';
+import { useCommands } from '@/app/_discovery/commands-context';
 
 export function IncidentPage({ number }: { number?: string }) {
   const { state } = useSessionRuntime();
@@ -64,6 +64,11 @@ function IdentityIncidentPage({
   const params = useSearchParams();
   const cache = useQueryClient();
   const [creating, setCreating] = useState(false);
+  const commands = useCommands();
+  useEffect(
+    () => (number ? undefined : commands?.registerCreate(() => setCreating(true))),
+    [commands, number],
+  );
   const current = useQuery({
     queryKey: currentUserKey(userId, workspaceId),
     queryFn: ({ signal }) =>
@@ -156,7 +161,6 @@ function IdentityIncidentPage({
           return previous && previous.revision > incident.revision ? previous : incident;
         }),
   });
-  useListRealtime(!number && !!current.data && !!list.data, userId, workspaceId);
   const mutation = useMutation({
     retry: false,
     mutationFn: ({ input, requestId }: { input: CreateIncidentInput; requestId: string }) =>

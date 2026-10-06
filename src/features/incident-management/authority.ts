@@ -30,6 +30,8 @@ export const incidentAuthoritySchema = z.object({
           'severity_changed',
         ]),
         incident: incidentSchema,
+        actorId: z.string().optional(),
+        addedParticipantIds: z.array(z.string()).optional(),
       }),
     )
     .default([]),
@@ -87,6 +89,13 @@ export class MockIncidentAuthority {
     private readonly store: IncidentStore,
     private readonly now = Date.now,
   ) {}
+  inspectAccessible<T>(actor: IncidentActor, inspect: (records: readonly Incident[]) => T) {
+    if (!canCreateIncident(actor, actor.workspaceId))
+      throw new AppError('authorization', 'Access denied.', 403);
+    return this.store.transact((data) =>
+      inspect(data.incidents.filter((record) => canViewIncident(actor, record))),
+    );
+  }
   async list(actor: IncidentActor, params: URLSearchParams, users: WorkspaceUser[]) {
     if (!canCreateIncident(actor, actor.workspaceId))
       throw new AppError('authorization', 'Access denied.', 403);
@@ -192,7 +201,12 @@ export class MockIncidentAuthority {
         resolvedAt: null,
       });
       data.incidents.push(incident);
-      data.changes.push({ kind: 'incident_created', incident: structuredClone(incident) });
+      data.changes.push({
+        kind: 'incident_created',
+        incident: structuredClone(incident),
+        actorId: actor.id,
+        addedParticipantIds: incident.participantIds.filter((id) => id !== actor.id),
+      });
       data.receipts[key] = { number, fingerprint };
       return incident;
     });
@@ -238,6 +252,10 @@ export class MockIncidentAuthority {
             ? 'severity_changed'
             : 'incident_updated',
         incident: structuredClone(next),
+        actorId: actor.id,
+        addedParticipantIds: next.participantIds.filter(
+          (id) => !previous.participantIds.includes(id),
+        ),
       });
       return next;
     });

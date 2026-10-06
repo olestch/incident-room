@@ -1,4 +1,5 @@
 'use client';
+import { useCommands } from '@/app/_discovery/commands-context';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   useInfiniteQuery,
@@ -408,7 +409,7 @@ export function ThreadSurface({
     setNavigationStatus('Showing latest Thread replies.');
     viewport.current?.latest();
   };
-  const closeSafely = () => {
+  const closeSafely = useCallback(() => {
     typing(false, root);
     void flush()
       .then(close)
@@ -417,7 +418,9 @@ export function ThreadSurface({
           'Draft could not be saved before closing. Your text and reply target remain here.',
         ),
       );
-  };
+  }, [typing, root, flush, close]);
+  const appCommands = useCommands();
+  useEffect(() => appCommands?.registerThread(closeSafely), [appCommands, closeSafely]);
   const typers = [
     ...new Set(
       members
@@ -456,6 +459,11 @@ export function ThreadSurface({
         <h2 id="thread-heading" className="text-xl font-semibold">
           Thread
         </h2>
+        {appCommands && (
+          <button className="incident-button lg:hidden" onClick={() => appCommands.openPalette()}>
+            Thread commands
+          </button>
+        )}
         <button data-thread-close className="incident-button" onClick={closeSafely}>
           Back to Timeline / Close Thread
         </button>
