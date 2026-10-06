@@ -18,7 +18,7 @@ Support one coherent product with identity isolation, paginated history, durable
 - Stable identity and revisions, not network arrival order, determine reconciliation.
 - Cancellation and lifecycle disposal are explicit.
 - Persistence is user-scoped; authentication precedes restoration.
-- Public framework documentation and this project's own documents are the only implementation references. The private commercial repository is not consulted.
+- Public framework documentation and this project's own documents are the only implementation references. Code, protocols and fixtures are independently authored.
 - Build only infrastructure needed now; later capabilities below are designs, not claims of implemented features.
 
 ## 3. Runtime model
@@ -416,6 +416,16 @@ Final scope excludes production backend/native WebSocket infrastructure, OAuth, 
 - **Maintenance:** Web Locks shared page lease exists only to reject destructive replacement/reset while another app tab is active. Exclusive maintenance captures identity, pauses new HTTP, disposes/drains current session/local work, awaits started mock requests, and operates explicit named native stores. Reset clears all fictional authorities and local work, then login/seed. Dataset replacement resets INC-2841 Timeline/Threads, workspace journal and all local identity work; fresh route/checkpoints follow. Unrelated origin storage stays untouched. Partial storage failure is not globally atomic; reload/retry reset before trusting state. Unsupported Web Locks refuses safely. This is not cross-tab runtime synchronization/ownership.
 - **Packaging:** landing/metadata/Team/Settings now describe actual product, README is a reviewer entry with real stack and fictional fast path; no uninstalled Radix/shadcn or native WebSocket claim. Architecture historical concrete-phase records remain labelled historical. ProductSpec unchanged, final mapping discloses commander subsystem gap and browser preferences/dirty-history limitations. Screenshot workflow uses existing Playwright attachments, no bulky binary assets or visual regression subsystem.
 - **Quality/deployment:** focused deterministic Demo tests and production browser flows cover request latency/failure, real offline/resync, persistent activity, 50k bounded DOM/old Thread, exclusive reset and responsive keyboard surface. Existing 10k/projection boundaries remain. Stable allowed local E2E configuration and normal CI are reported honestly; unchanged six-worker observation stays documented. Node/Next HTTPS deployment requirements and actual remote smoke/manual account step live in deployment.md, not an invented hosted URL.
+
+### Demo control semantics
+
+These details supplement the concise README controls; they describe existing behavior, not additional functionality.
+
+- **Scheduling:** latency applies before ordinary mock reads/mutations. Authentication, realtime polling and Demo requests are exempt. Method+pathname counters restart on applying configuration; the first one/three slots of each ten fail before persistence for 10/30%. Safe-read retry may recover on a later slot. Existing private-to-tests authority fixtures separately cover after-persistence ambiguity; the public failure control does not simulate that ambiguity.
+- **Generation:** uses the current Incident, falling back to INC-2841 outside a room. Monitoring/deployment/human events derive stable IDs/order from the authority counter and logical time from latest activity; status audit time uses the authority clock. Human generation selects an eligible active same-workspace participant when available. Resolved denies operational generation; status CAS rejects stale transitions. Source changes, retained journal and recipient notification ingestion remain authoritative.
+- **Datasets:** INC-2841 fixture IDs are `evt-N`, with September 2026 logical timestamps and deterministic mixed types/bodies. Confirmed replacement clears that room's Threads, the workspace journal and all identities' local drafts/outbox to avoid orphan work. Other Incidents, Notifications and Postmortems remain; older notification targets may become unavailable. Route reload establishes fresh windows/checkpoints and default configuration.
+- **Reset:** confirmed exclusive maintenance disposes/drains session/local work and finishes in-flight mock requests before clearing eight explicit fictional/local stores. This removes accounts/leases, created Incidents, Timeline/Threads, Notifications, Postmortems/Actions and all drafts/outbox, then returns to login; lazy defaults restore on read. It does not delete databases or clear unrelated origin storage. Maintenance across databases is not globally atomic: after a storage failure, reload/check storage and retry reset before trusting partial state.
+- **Clear simulations:** changes configuration only; persistent data remains. Configuration is tab-local and resets on full reload. Close other loaded app tabs before replacement/reset; unsupported Web Locks refuses maintenance safely.
 
 ## Public implementation references
 

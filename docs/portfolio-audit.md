@@ -29,7 +29,7 @@ Confirmed Timeline projection caches acquisition references; ephemeral typing/pr
 
 Existing real 10k cases remain; Phase 9 adds 50k authority replacement/recent DOM and old target/Thread bounded DOM. These are functional sanity observations, not FPS/p95 promises. Whole authority buckets still validate/clone/write in native transactions; Search and polling can consume CPU at stress scale. Production would need indexed server queries/retention, not more UI memoization. Loaded Query windows/acknowledgments grow with deliberate acquisition; virtualization bounds DOM, not all memory.
 
-Known local boundary: unchanged six-worker Phase 8 runs yielded 142/156 and 148/156; an old timeout reproduced with Phase 7 sources. Phase 8 CI #9 passed 309 unit/component and 156 browser tests with two workers, zero actual retries. Phase 9 uses the authorized stable two-worker/no-retry local configuration and independent normal CI. No worker/timeout/retry/assertion/CI weakening. Exact high-concurrency root cause remains unresolved; supported green runs do not prove six-worker stability.
+Known local boundary: unchanged six-worker Phase 8 runs yielded 142/156 and 148/156; an old timeout reproduced with Phase 7 sources. Phase 8 CI #9 passed 309 unit/component and 156 browser tests with two workers, zero actual retries. Phase 9 local validation and [CI #10](https://github.com/olestch/incident-room/actions/runs/37513285727) passed 319 unit/integration/component and 166 browser tests; browser execution used two workers and zero actual retries. No worker/timeout/retry/assertion/CI weakening. Exact high-concurrency root cause remains unresolved; supported green runs do not prove six-worker stability.
 
 ## Dependency/public-data review
 
