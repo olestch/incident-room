@@ -1,5 +1,12 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import {
+  threadKeys,
+  mergeThread,
+  mergeMessages,
+  type Thread,
+  type ThreadMessage,
+} from '@/entities/thread/model';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { CurrentUser } from '@/entities/current-user/model';
 import { incidentKeys, type Incident } from '@/entities/incident/model';
@@ -23,11 +30,19 @@ import { connectionChanged, type ConnectionStatus } from '@/features/realtime/co
 import type { DeliveryCoordinator } from '@/features/timeline/delivery';
 import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { useAppDispatch } from '@/app/_providers/hooks';
+import { hasAcquiredThreadMessage, mergeThreadSnapshotWindow } from './thread-cache';
 
+export interface ActiveThreadPort {
+  root: string;
+  loadedIds(): string[];
+  acknowledge(message: ThreadMessage): Promise<void>;
+  created(message: ThreadMessage): void;
+}
 export function useRoomRealtime(
   incident: Incident,
   actor: CurrentUser,
   delivery: DeliveryCoordinator,
+  threadPort?: RefObject<ActiveThreadPort | null>,
 ) {
   const { coordinator: session, adapter } = useSessionRuntime();
   const cache = useQueryClient();
@@ -69,21 +84,35 @@ export function useRoomRealtime(
     const known = (id: string) =>
       windows().some((window) => window.items.some((entry) => entry.id === id)) ||
       (cache.getQueryData<TimelineEntry[]>(ackKey) ?? []).some((entry) => entry.id === id);
-    const merge = (entry: TimelineEntry) =>
-      cache.setQueryData<TimelineEntry[]>(ackKey, (previous = []) => [
+    const merge = (entry: TimelineEntry) => {
+      const rootKey = [
+        ...threadKeys.all(actor.id, actor.workspaceId, incident.id, entry.id),
+        'root',
+      ];
+      if (cache.getQueryState(rootKey))
+        cache.setQueryData<TimelineEntry>(rootKey, (previous) =>
+          !previous ||
+          previous.revision < entry.revision ||
+          (previous.revision === entry.revision && entry.tombstone)
+            ? entry
+            : previous,
+        );
+      return cache.setQueryData<TimelineEntry[]>(ackKey, (previous = []) => [
         ...mergeEntries(new Map(previous.map((value) => [value.id, value])), [entry]).values(),
       ]);
+    };
     const read = <T>(path: string, schema: import('zod').z.ZodType<T>, signal: AbortSignal) =>
       session.request((s) => adapter.resource(`${root}${path}`, schema, s), 'safe-read', signal);
     const transport = new MockRealtimeTransport({
       open: (signal) => read('/open', openSchema, signal),
       stream: (after, signal) =>
         read(`/stream?after=${after}&client=${clientId}`, streamSchema, signal),
-      presence: (action, typing, signal) =>
+      presence: (action, typing, signal, typingScope) =>
         ephemeralRequest(
           {
             action,
             typing,
+            typingScope,
             clientId,
             userId: actor.id,
             room: JSON.stringify([actor.workspaceId, incident.id]),
@@ -128,6 +157,53 @@ export function useRoomRealtime(
           return;
         }
         if (event.incidentId !== incident.id) return;
+        if (event.resourceType === 'thread') {
+          const summaryKey = threadKeys.summary(
+            actor.id,
+            actor.workspaceId,
+            incident.id,
+            event.payload.rootTimelineEntryId,
+          );
+          cache.setQueryData<Thread | null>(summaryKey, (previous) =>
+            mergeThread(previous, event.payload),
+          );
+          return;
+        }
+        if (event.resourceType === 'thread_message') {
+          const message = event.payload;
+          const port = threadPort?.current;
+          if (port?.root === message.rootTimelineEntryId) {
+            const existed = hasAcquiredThreadMessage(
+              cache,
+              threadKeys.all(actor.id, actor.workspaceId, incident.id, port.root),
+              message.id,
+            );
+            const threadAckKey = threadKeys.acknowledgments(
+              actor.id,
+              actor.workspaceId,
+              incident.id,
+              message.rootTimelineEntryId,
+            );
+            cache.setQueryData<ThreadMessage[]>(threadAckKey, (previous = []) => [
+              ...mergeMessages(new Map(previous.map((m) => [m.id, m])), [message]).values(),
+            ]);
+            await port.acknowledge(message);
+            if (valid() && connectedOnce && !existed && event.kind === 'thread_message_created')
+              port.created(message);
+          } else {
+            // Closed histories remain bounded Query resources. Mark stale, never eagerly load them.
+            void cache.invalidateQueries({
+              queryKey: threadKeys.all(
+                actor.id,
+                actor.workspaceId,
+                incident.id,
+                message.rootTimelineEntryId,
+              ),
+              refetchType: 'none',
+            });
+          }
+          return;
+        }
         const existed = known(event.resourceId);
         merge(event.payload);
         await delivery.acknowledge(event.payload);
@@ -144,17 +220,27 @@ export function useRoomRealtime(
         }
       },
       snapshot: async (signal) => {
+        const activeThread = threadPort?.current;
         const ids = [
           ...new Set(
             windows()
               .flatMap((window) => window.items.map((entry) => entry.id))
-              .concat((cache.getQueryData<TimelineEntry[]>(ackKey) ?? []).map((entry) => entry.id)),
+              .concat(
+                (cache.getQueryData<TimelineEntry[]>(ackKey) ?? []).map((entry) => entry.id),
+                activeThread ? [activeThread.root] : [],
+              ),
           ),
         ];
-        const batches = Math.max(1, Math.ceil(ids.length / 60));
+        const messageIds = activeThread?.loadedIds() ?? [];
+        const batches = Math.max(1, Math.ceil(ids.length / 60), Math.ceil(messageIds.length / 60));
         for (let index = 0; index < batches; index++) {
           const query = new URLSearchParams();
           for (const id of ids.slice(index * 60, (index + 1) * 60)) query.append('entry', id);
+          if (activeThread) {
+            query.set('thread', activeThread.root);
+            for (const id of messageIds.slice(index * 60, (index + 1) * 60))
+              query.append('message', id);
+          }
           const snapshot = await read(`/snapshot?${query}`, snapshotSchema, signal);
           signal.throwIfAborted();
           if (
@@ -176,8 +262,48 @@ export function useRoomRealtime(
               merge(entry);
               await delivery.acknowledge(entry);
             }
+          if (threadPort?.current === activeThread && activeThread) {
+            for (const discussion of snapshot.threads) {
+              if (discussion.root !== activeThread.root)
+                throw new Error('Invalid Thread snapshot scope');
+              if (discussion.summary)
+                cache.setQueryData<Thread | null>(
+                  threadKeys.summary(actor.id, actor.workspaceId, incident.id, discussion.root),
+                  (previous) => mergeThread(previous, discussion.summary!),
+                );
+              for (const window of discussion.windows) {
+                for (const message of window.items) {
+                  if (
+                    message.workspaceId !== actor.workspaceId ||
+                    message.incidentId !== incident.id ||
+                    message.rootTimelineEntryId !== discussion.root
+                  )
+                    throw new Error('Invalid Thread message snapshot');
+                }
+                const fresh = mergeThreadSnapshotWindow(
+                  cache,
+                  threadKeys.all(actor.id, actor.workspaceId, incident.id, discussion.root),
+                  window.items,
+                );
+                for (const message of window.items) {
+                  await activeThread.acknowledge(message);
+                  if (
+                    valid() &&
+                    threadPort?.current === activeThread &&
+                    connectedOnce &&
+                    fresh.has(message.id)
+                  )
+                    activeThread.created(message);
+                }
+              }
+            }
+          }
         }
         void cache.invalidateQueries({ queryKey: incidentKeys.all(actor.id, actor.workspaceId) });
+        void cache.invalidateQueries({
+          queryKey: threadKeys.room(actor.id, actor.workspaceId, incident.id),
+          predicate: (query) => query.queryKey.at(-1) === 'summary',
+        });
       },
     });
     runtime.current = service;
@@ -212,12 +338,18 @@ export function useRoomRealtime(
     dispatch,
     session,
     adapter,
+    threadPort,
   ]);
+  const retry = useCallback(() => runtime.current?.retry(), []);
+  const typing = useCallback(
+    (value: boolean, root?: string) => runtime.current?.typing(value, root),
+    [],
+  );
   return {
     status,
     members,
     arrivals,
-    retry: () => runtime.current?.retry(),
-    typing: (value: boolean) => runtime.current?.typing(value),
+    retry,
+    typing,
   };
 }

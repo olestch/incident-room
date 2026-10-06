@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import { queryScope } from '@/shared/query/query-scope';
 
-export const messageBodySchema = z
-  .string()
-  .max(4000)
-  .refine((body) => body.trim().length > 0, 'Write a message (1–4,000 characters).');
+import { messageBodySchema } from '@/shared/messaging/model';
+export { messageBodySchema, compareEntries, mergeEntries } from '@/shared/messaging/model';
 const base = {
   id: z.string().min(1).max(160),
   incidentId: z.string().min(1),
@@ -86,23 +84,3 @@ export const timelineKeys = {
   acknowledgments: (userId: string, workspaceId: string, incidentId: string) =>
     [...timelineKeys.all(userId, workspaceId, incidentId), 'acknowledgments'] as const,
 };
-export function compareEntries(a: TimelineEntry, b: TimelineEntry) {
-  return (
-    a.occurredAt.localeCompare(b.occurredAt) ||
-    a.serverTieOrder - b.serverTieOrder ||
-    a.id.localeCompare(b.id)
-  );
-}
-/** Payload-independent merge: future HTTP/realtime callers use exactly this revision rule. */
-export function mergeEntries(index: Map<string, TimelineEntry>, entries: readonly TimelineEntry[]) {
-  for (const entry of entries) {
-    const previous = index.get(entry.id);
-    if (
-      !previous ||
-      entry.revision > previous.revision ||
-      (entry.revision === previous.revision && entry.tombstone && !previous.tombstone)
-    )
-      index.set(entry.id, entry);
-  }
-  return index;
-}

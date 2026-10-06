@@ -7,6 +7,8 @@ import { IndexedDbIncidentStore } from '@/features/incident-management/indexeddb
 import { incidentHandlers } from '@/features/incident-management/handlers';
 import { MockTimelineAuthority, makeTimelineAuthorityStore } from '@/features/timeline/authority';
 import { timelineHandlers } from '@/features/timeline/handlers';
+import { MockThreadAuthority, makeThreadAuthorityStore } from '@/features/threads/authority';
+import { threadHandlers } from '@/features/threads/handlers';
 import { EventJournal, makeJournalStore } from '@/features/realtime/journal';
 import { composeRealtimeAuthority } from './realtime-authority';
 
@@ -17,6 +19,17 @@ export function startMock() {
     const incidents = new MockIncidentAuthority(new IndexedDbIncidentStore());
     const timeline = new MockTimelineAuthority(makeTimelineAuthorityStore());
     const journal = new EventJournal(makeJournalStore());
+    const authenticate = async (client: string) => {
+      const session = await auth.current(client);
+      if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
+      return session.user;
+    };
+    const threads = new MockThreadAuthority(
+      makeThreadAuthorityStore(),
+      async (actor, incident, root) => {
+        await timeline.locate(actor, incident, root);
+      },
+    );
     const worker = setupWorker(
       ...authHandlers(auth),
       ...incidentHandlers(
@@ -38,11 +51,23 @@ export function startMock() {
         (actor, number) => incidents.detail(actor, number),
         (actor, number, time) => incidents.recordActivity(actor, number, time),
       ),
-      ...composeRealtimeAuthority(journal, incidents, timeline, async (client) => {
-        const session = await auth.current(client);
-        if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
-        return session.user;
-      }),
+      ...threadHandlers(
+        threads,
+        authenticate,
+        (actor, number) => incidents.detail(actor, number),
+        (actor, number, time) => incidents.recordActivity(actor, number, time),
+      ),
+      ...composeRealtimeAuthority(
+        journal,
+        incidents,
+        timeline,
+        async (client) => {
+          const session = await auth.current(client);
+          if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
+          return session.user;
+        },
+        threads,
+      ),
     );
     startup = worker
       .start({

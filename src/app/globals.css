@@ -37,11 +37,73 @@ body {
   overflow-wrap: anywhere;
 }
 .timeline-target {
-  border-left: 4px solid var(--color-focus);
+  box-shadow: inset 4px 0 var(--color-focus);
   background: #eff6ff;
 }
 .timeline-compose {
   padding: 1rem 0 max(1rem, env(safe-area-inset-bottom));
+}
+.thread-room-layout {
+  min-width: 0;
+}
+.thread-summary {
+  margin-top: 0.5rem;
+}
+.thread-surface {
+  min-width: 0;
+  background: var(--color-surface);
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.thread-root {
+  max-height: 10rem;
+  overflow: auto;
+  border-bottom: 1px solid var(--color-line);
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+.reply-reference {
+  display: block;
+  text-align: left;
+  padding: 0.5rem;
+  border-left: 3px solid var(--color-focus);
+  background: #eff6ff;
+  overflow-wrap: anywhere;
+  min-height: 2.75rem;
+  width: 100%;
+}
+.thread-reply-context {
+  border: 1px solid var(--color-line);
+  padding: 0.5rem;
+}
+.thread-surface .timeline-viewport {
+  height: min(40dvh, 28rem);
+}
+@media (min-width: 64rem) {
+  .thread-room-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr);
+    align-items: start;
+    gap: 1rem;
+  }
+}
+@media (max-width: 63.99rem) {
+  .thread-surface {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    border-radius: 0;
+    padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem max(1rem, env(safe-area-inset-bottom));
+  }
+  .thread-surface .timeline-viewport {
+    height: 32dvh;
+    min-height: 8rem;
+  }
 }
 @media (min-width: 64rem) {
   .incident-room-layout {

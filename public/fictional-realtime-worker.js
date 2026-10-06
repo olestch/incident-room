@@ -26,15 +26,18 @@ globalThis.addEventListener('message', (event) => {
       userId: input.userId,
       expiresAt: now + 4000,
       typingUntil: input.typing === true ? now + 3000 : 0,
+      typingScope:
+        input.typing === true && typeof input.typingScope === 'string' ? input.typingScope : null,
     });
   port.postMessage(
     [...leases.values()]
       .filter((lease) => lease.room === input.room)
-      .map(({ clientId, userId, expiresAt, typingUntil }) => ({
+      .map(({ clientId, userId, expiresAt, typingUntil, typingScope }) => ({
         clientId,
         userId,
         expiresAt,
         typingUntil,
+        typingScope,
       })),
   );
 });

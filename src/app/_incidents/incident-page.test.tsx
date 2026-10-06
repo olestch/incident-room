@@ -34,6 +34,9 @@ import { useSessionRuntime, useLocalWork } from '@/app/_providers/session-provid
 import { IncidentPage } from './incident-page';
 import { EventJournal, seedJournal } from '@/features/realtime/journal';
 import { composeRealtimeAuthority } from '@/app/_mocks/realtime-authority';
+import { MockThreadAuthority, seedThreads } from '@/features/threads/authority';
+import { threadHandlers } from '@/features/threads/handlers';
+import { TimelineProjection } from '@/features/timeline/projection';
 vi.mock('@/features/realtime/ephemeral-broker', () => ({ ephemeralRequest: async () => [] }));
 
 const navigation = vi.hoisted(() => ({
@@ -42,7 +45,11 @@ const navigation = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: navigation.push }),
+  useRouter: () => ({
+    push: navigation.push,
+    replace: navigation.push,
+    back: () => navigation.push('/app/incidents/INC-2841'),
+  }),
   useSearchParams: () =>
     new URLSearchParams(
       useSyncExternalStore(
@@ -82,7 +89,24 @@ beforeEach(async () => {
   auth = new MockAuthAuthority(new MemoryAuthorityStore());
   authority = new MockIncidentAuthority(new MemoryIncidentStore());
   const timeline = new MockTimelineAuthority(new MemoryAtomicStore(seedTimeline));
+  const threads = new MockThreadAuthority(
+    new MemoryAtomicStore(seedThreads),
+    async (actor, incident, root) => {
+      await timeline.locate(actor, incident, root);
+    },
+  );
+  const authenticate = async (id: string) => {
+    const session = await auth.current(id);
+    if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
+    return session.user;
+  };
   server.use(
+    ...threadHandlers(
+      threads,
+      authenticate,
+      (actor, number) => authority.detail(actor, number),
+      (actor, number, time) => authority.recordActivity(actor, number, time),
+    ),
     ...composeRealtimeAuthority(
       new EventJournal(new MemoryAtomicStore(seedJournal)),
       authority,
@@ -92,6 +116,7 @@ beforeEach(async () => {
         if (!session) throw new AuthorityError('UNAUTHENTICATED', 401);
         return session.user;
       },
+      threads,
     ),
     ...timelineHandlers(
       timeline,
@@ -165,6 +190,147 @@ function mount(number?: string) {
     </QueryClientProvider>,
   );
 }
+const threadRoot = 'fictional-incident-2841:evt-4000';
+const threadSurface = () => screen.getByRole('complementary', { name: 'Thread' });
+async function mountThread(root = threadRoot) {
+  navigation.search = `?thread=${encodeURIComponent(root)}`;
+  mount('INC-2841');
+  const input = await within(
+    await screen.findByRole('complementary', { name: 'Thread' }),
+  ).findByLabelText('Message');
+  await waitFor(() => expect(input).toBeEnabled());
+  return input;
+}
+it('Thread open/close uses URL and retains the Timeline projection cache', async () => {
+  mount('INC-2841');
+  const open = await screen.findByRole('button', {
+    name: 'Open Thread for fictional-incident-2841:evt-3941',
+  });
+  const key = timelineKeys.history('demo-sage', 'demo-orbit', 'fictional-incident-2841');
+  const previous = cache.getQueryData(key);
+  await userEvent.setup().click(open);
+  expect(await screen.findByRole('complementary', { name: 'Thread' })).toBeVisible();
+  await within(threadSurface()).findByText('No replies yet. The first reply creates this Thread.');
+  expect(cache.getQueryData(key)).toBe(previous);
+  await userEvent
+    .setup()
+    .click(
+      within(threadSurface()).getByRole('button', { name: 'Back to Timeline / Close Thread' }),
+    );
+  await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Thread' })).toBeNull());
+  expect(cache.getQueryData(key)).toBe(previous);
+});
+it('Thread Reply/cancel retains body and atomically persists context per root', async () => {
+  const input = await mountThread();
+  const user = userEvent.setup();
+  await user.type(input, 'Fictional draft');
+  await user.click(within(threadSurface()).getAllByRole('button', { name: 'Reply' }).at(-1)!);
+  expect(within(threadSurface()).getByLabelText('Reply context')).toHaveTextContent('Replying to');
+  await user.click(within(threadSurface()).getByRole('button', { name: 'Cancel reply' }));
+  expect(input).toHaveValue('Fictional draft');
+  await user.click(within(threadSurface()).getAllByRole('button', { name: 'Reply' }).at(-1)!);
+  await user.click(
+    within(threadSurface()).getByRole('button', { name: 'Back to Timeline / Close Thread' }),
+  );
+  const work = vi.mocked(useLocalWork).mock.results.at(-1)!.value;
+  expect(
+    await work.read(
+      work.lease({
+        userId: 'demo-sage',
+        workspaceId: 'demo-orbit',
+        incidentId: 'fictional-incident-2841',
+        rootTimelineEntryId: threadRoot,
+      }),
+    ),
+  ).toMatchObject({
+    draft: 'Fictional draft',
+    replyToMessageId: 'fictional-incident-2841:reply-4000-8',
+  });
+});
+it('Thread compose and reply context do not rebuild or sort the Timeline projection', async () => {
+  const build = vi.spyOn(TimelineProjection.prototype, 'build');
+  const input = await mountThread();
+  const before = build.mock.calls.length;
+  await userEvent.setup().type(input, 'Separate Thread state');
+  await userEvent
+    .setup()
+    .click(within(threadSurface()).getAllByRole('button', { name: 'Reply' }).at(-1)!);
+  expect(build).toHaveBeenCalledTimes(before);
+  build.mockRestore();
+});
+it('Thread persistence failure leaves actual compose body and reply context without network dispatch', async () => {
+  const input = await mountThread();
+  const user = userEvent.setup();
+  await user.type(input, 'Retained Thread editor');
+  await user.click(within(threadSurface()).getAllByRole('button', { name: 'Reply' }).at(-1)!);
+  const work = vi.mocked(useLocalWork).mock.results.at(-1)!.value;
+  vi.spyOn(work, 'handoff').mockRejectedValue(new Error('Storage unavailable'));
+  const post = vi.fn();
+  server.use(
+    http.post('*/mock-api/incidents/:number/threads/:root/messages', () => {
+      post();
+      return HttpResponse.json({});
+    }),
+  );
+  await user.click(within(threadSurface()).getByRole('button', { name: 'Send' }));
+  expect(await within(threadSurface()).findByRole('alert')).toHaveTextContent(
+    'Text and reply target remain here',
+  );
+  expect(input).toHaveValue('Retained Thread editor');
+  expect(within(threadSurface()).getByLabelText('Reply context')).toHaveTextContent('reply 8');
+  expect(post).not.toHaveBeenCalled();
+});
+it('first reply creates Thread, clears draft/reply context only after durable handoff, renders flat confirmation', async () => {
+  const input = await mountThread('fictional-incident-2841:evt-3999');
+  expect(
+    within(threadSurface()).getByText('No replies yet. The first reply creates this Thread.'),
+  ).toBeVisible();
+  const user = userEvent.setup();
+  await user.type(input, 'First contextual reply');
+  await user.click(within(threadSurface()).getByRole('button', { name: 'Send' }));
+  await waitFor(() => expect(input).toHaveValue(''));
+  expect(await within(threadSurface()).findByText('First contextual reply')).toBeVisible();
+  await waitFor(() =>
+    expect(
+      cache.getQueryData([
+        'identity',
+        'demo-sage',
+        'demo-orbit',
+        'threads',
+        'fictional-incident-2841',
+        'fictional-incident-2841:evt-3999',
+        'summary',
+      ]),
+    ).toMatchObject({ confirmedMessageCount: 1 }),
+  );
+  expect(
+    within(threadSurface()).getByRole('list', { name: 'Thread entries' }).querySelector('li li'),
+  ).toBeNull();
+});
+it('direct unloaded root and message resolve independently without adding a Timeline target window', async () => {
+  navigation.search =
+    '?thread=fictional-incident-2841:evt-42&message=fictional-incident-2841:reply-42-8';
+  mount('INC-2841');
+  expect(await screen.findByText('Target found in Thread.')).toBeVisible();
+  expect(
+    threadSurface().querySelector('[data-entry-id="fictional-incident-2841:reply-42-8"]'),
+  ).toHaveClass('timeline-target');
+  expect(
+    cache
+      .getQueriesData({
+        queryKey: timelineKeys.all('demo-sage', 'demo-orbit', 'fictional-incident-2841'),
+      })
+      .filter(([key]) => key.includes('target')),
+  ).toHaveLength(0);
+});
+it('Thread unavailable root error stays explicit and does not replace usable Timeline with an empty room', async () => {
+  navigation.search = '?thread=fictional-incident-2841:evt-missing';
+  mount('INC-2841');
+  expect(await screen.findByText('Thread root unavailable.')).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Timeline' })).toBeVisible();
+  expect(within(threadSurface()).queryByText(/No replies yet/)).toBeNull();
+  expect(within(threadSurface()).queryByRole('textbox')).toBeNull();
+});
 it('loads server data, applies URL filters and My Incidents, clears and resets pagination', async () => {
   const user = userEvent.setup();
   mount();

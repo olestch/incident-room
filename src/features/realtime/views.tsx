@@ -21,7 +21,9 @@ export function RealtimeSummary({
   const typing = names([
     ...new Set(
       members
-        .filter((member) => member.userId !== userId && member.typingUntil > 0)
+        .filter(
+          (member) => member.userId !== userId && member.typingUntil > 0 && !member.typingScope,
+        )
         .map((member) => member.userId),
     ),
   ]);

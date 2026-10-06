@@ -9,6 +9,7 @@ export interface MockTransportPort {
     action: 'join' | 'pulse' | 'leave',
     typing: boolean,
     signal: AbortSignal,
+    root?: string | undefined,
   ): Promise<PresenceMember[]>;
 }
 /** Independent per-client simulator. Polling the fictional server is transport delivery, not
@@ -20,6 +21,7 @@ export class MockRealtimeTransport implements RealtimeTransport {
   private deliveries = new Set<() => void>();
   private cursor = 0;
   private typingUntil = 0;
+  private typingScope: string | undefined;
   constructor(
     private readonly port: MockTransportPort,
     private readonly clock: RealtimeClock = systemClock,
@@ -83,6 +85,7 @@ export class MockRealtimeTransport implements RealtimeTransport {
           'pulse',
           this.typingUntil > this.clock.now(),
           scoped,
+          this.typingScope,
         );
         scoped.throwIfAborted();
         this.emit({
@@ -109,8 +112,9 @@ export class MockRealtimeTransport implements RealtimeTransport {
       void poll();
     }, 0);
   }
-  typing(active: boolean) {
+  typing(active: boolean, root?: string) {
     this.typingUntil = active ? this.clock.now() + 2500 : 0;
+    this.typingScope = root;
   }
   disconnect() {
     if (this.controller) {

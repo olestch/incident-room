@@ -44,6 +44,7 @@ export async function ephemeralRequest(
     userId: string;
     room: string;
     typing: boolean;
+    typingScope?: string | undefined;
   },
   signal: AbortSignal,
 ) {

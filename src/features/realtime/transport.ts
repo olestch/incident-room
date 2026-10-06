@@ -9,7 +9,7 @@ export interface RealtimeTransport {
   connect(signal: AbortSignal): Promise<void>;
   disconnect(): void;
   subscribe(listener: (event: TransportEvent) => void): () => void;
-  typing?(active: boolean): void;
+  typing?(active: boolean, root?: string | undefined): void;
 }
 
 // Validation/checkpoints/resync belong to the coordinator, never raw component callbacks.

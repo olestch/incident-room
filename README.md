@@ -2,7 +2,7 @@
 
 Incident Room is a public portfolio project for coordinating technical incidents. Dedicated incident rooms will combine operational context, a realtime timeline, contextual discussions, and postmortem documentation using fictional, deterministic data.
 
-**Current status:** Phase 5 Realtime Synchronization implemented. The existing virtual Timeline, history/deep links and durable draft/outbox now receive realtime confirmations through the same reconciliation path. Independent clients recover missed changes through a persistent journal, checkpoints and authoritative resync. Connection state, presence, typing and old-reader New updates are available. Threads, production WebSocket infrastructure and visible Demo Mode remain unimplemented.
+**Current status:** Phase 6 Threads implemented. Contextual discussions have flat replies, desktop side panel/mobile full-screen presentation, measured history, reply-reference navigation and direct links. Thread drafts/outbox extend the existing local database; replies and absolute summaries use the Phase 5 journal, transport, checkpoints and resync. Production WebSocket infrastructure, Notifications/Search/Postmortem and visible Demo Mode remain unimplemented.
 
 The accepted [Product Specification](docs/product-spec.md) defines product behavior. [Technical Architecture](docs/technical-architecture.md) defines ownership, runtime boundaries, persistence, realtime, and testing decisions. The accepted Phase 0 document is preserved unchanged, including its historical implementation-status marker.
 
@@ -39,6 +39,20 @@ Participants, commander and admins may compose on active incidents. Resolved/non
 Native IndexedDB stores identity/incident-scoped drafts and outbox separately from fictional server authority data. Drafts debounce for 250ms and flush on navigation/pagehide; the last uncommitted keystrokes cannot be guaranteed after an abrupt browser/process crash. Send atomically persists the outbox and clears its draft before clearing the editor or dispatching HTTP. Storage failure keeps editor text. Unknown transport outcomes are checked by mutation ID before any explicit Retry; reload never blindly resends. Explicit logout deletes this identity's local work; expiry/switch quarantine it. There is no offline-first/background delivery or cross-tab local coordination.
 
 Other future-feature destinations remain placeholders. Authentication preserves safe `/app/` return paths including query/hash; external/malformed returns fall back to `/app/incidents`. A full navigation crosses the auth boundary intentionally; in-app navigation uses Next.js.
+
+## Threads
+
+Each confirmed Timeline entry has a contextual discussion action. Opening an empty Thread does not persist a resource: its first confirmed reply creates exactly one Thread for that root. All replies share one chronological level; Reply sets a stable contextual message reference, never a child list. Cancel reply retains body text. Deleted parents/roots show semantic placeholders without removed content.
+
+Desktop keeps Timeline usable beside the Thread. Mobile uses a dedicated full-screen surface, with Back/Close, focus containment and keyboard-safe scroll/compose. Resizing preserves the same Thread component, draft, reply target and navigation generation. Browser history opens/closes the URL-owned surface; explicit View root in Timeline uses the existing Timeline locator and target coordinator.
+
+Canonical links follow the accepted specification: `?thread=<rootTimelineEntryId>&message=<threadMessageId>`. Existing `event`, unrelated parameters and hash are preserved. An event target controls only Timeline navigation; Thread root resolution does not itself scroll Timeline. Message/reference targets use a locator and bounded window, not linear pagination. For example, `/app/incidents/INC-2841?thread=fictional-incident-2841%3Aevt-42&message=fictional-incident-2841%3Areply-42-800` opens a large old discussion. Root evt-4000 starts with eight replies; evt-42 starts with 2,000 independently fictional replies.
+
+History pages contain at most 60 messages; target windows at most 51. One measured virtual stream merges Query history/target/acknowledgment resources and durable local records using revisions and author+mutation aliases. Older pages preserve the reading anchor; replies follow only near newest, otherwise New replies appears. Summaries contain absolute confirmed count, participants and activity; duplicate events cannot increment them.
+
+Thread drafts include body and reply target, scoped by user/workspace/incident/root in the existing `incident-room-local-work-v1` database. Send atomically moves both to the existing outbox before clearing the editor. Unknown outcomes are looked up before explicit same-UUID retry; reload does not resend. Logout clears all local work for that identity. Abrupt-crash limits are the same as Timeline's debounced drafts.
+
+Thread messages and summaries extend the existing persistent journal and one room transport/resync runtime. Closed Thread histories are marked stale without eager fetching. Expired checkpoints repair only the active Thread's recent/already loaded messages plus the Timeline resources. Thread typing uses the existing ephemeral broker, scoped by root and distinct from Timeline typing; presence remains incident-wide. No new dependencies or second local persistence system were introduced.
 
 ## Realtime simulation
 

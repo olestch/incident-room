@@ -10,7 +10,13 @@ export function realtimeHandlers(
   authenticate: (client: string) => Promise<IncidentActor>,
   detail: (actor: IncidentActor, number: string) => Promise<Incident>,
   ingest: (actor: IncidentActor, incident: Incident) => Promise<void>,
-  snapshot: (actor: IncidentActor, incident: Incident, ids: string[]) => Promise<unknown>,
+  snapshot: (
+    actor: IncidentActor,
+    incident: Incident,
+    ids: string[],
+    threadRoot: string | null,
+    messageIds: string[],
+  ) => Promise<unknown>,
 ) {
   const root = '*/mock-api/incidents/:number/realtime';
   const handle =
@@ -91,6 +97,8 @@ export function realtimeHandlers(
           actor,
           incident,
           z.array(z.string().max(300)).max(60).parse(url.searchParams.getAll('entry')),
+          z.string().max(160).nullable().parse(url.searchParams.get('thread')),
+          z.array(z.string().max(400)).max(60).parse(url.searchParams.getAll('message')),
         ),
       ),
     ),

@@ -276,8 +276,8 @@ export class RealtimeCoordinator {
     this.cancelRetry = null;
     void this.recover();
   }
-  typing(active: boolean) {
-    if (this.synchronized) this.transport.typing?.(active);
+  typing(active: boolean, root?: string) {
+    if (this.synchronized) this.transport.typing?.(active, root);
   }
   dispose() {
     if (this.disposed) return;
