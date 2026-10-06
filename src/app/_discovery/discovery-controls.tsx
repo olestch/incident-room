@@ -42,7 +42,7 @@ export function DiscoveryControls({
       }),
     [appCommands],
   );
-  useListRealtime(!/^\/app\/incidents\/[^/]+/.test(pathname), userId, workspaceId);
+  useListRealtime(!/^\/app\/incidents\/INC-\d+\/?$/.test(pathname), userId, workspaceId);
   const unread = useQuery({
     queryKey: notificationKeys.unread(userId, workspaceId),
     queryFn: async ({ signal }) =>
@@ -155,7 +155,8 @@ export function DiscoveryControls({
             setOpen(false);
             if (command.action === 'create') appCommands?.create();
             else if (command.action === 'close-thread') appCommands?.closeThread();
-            else if (command.destination) router.push(command.destination);
+            else if (command.destination && (appCommands?.canLeave() ?? true))
+              router.push(command.destination);
           }}
         />
       )}

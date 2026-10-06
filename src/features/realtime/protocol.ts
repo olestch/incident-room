@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { postmortemSchema, actionItemSchema } from '@/entities/postmortem/model';
 import { incidentSchema } from '@/entities/incident/model';
 import { notificationChangeSchema } from '@/entities/notification/model';
 import { timelineEntrySchema, timelineWindowSchema } from '@/entities/timeline/model';
@@ -19,6 +20,20 @@ const base = {
 };
 export const persistentEventSchema = z
   .discriminatedUnion('resourceType', [
+    z.object({
+      ...base,
+      resourceType: z.literal('postmortem'),
+      kind: z.literal('postmortem_updated'),
+      incidentId: z.string().min(1),
+      payload: postmortemSchema,
+    }),
+    z.object({
+      ...base,
+      resourceType: z.literal('action_item'),
+      kind: z.literal('action_item_updated'),
+      incidentId: z.string().min(1),
+      payload: actionItemSchema,
+    }),
     z.object({
       ...base,
       resourceType: z.literal('notification'),

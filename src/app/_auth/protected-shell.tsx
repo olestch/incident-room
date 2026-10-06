@@ -8,6 +8,7 @@ import type { SessionIdentity } from '@/features/session/session-model';
 import { safeReturnDestination } from '@/features/session/return-destination';
 import { CommandsProvider } from '@/app/_discovery/commands-context';
 import { DiscoveryControls } from '@/app/_discovery/discovery-controls';
+import { useCommands } from '@/app/_discovery/commands-context';
 import {
   SessionIssue,
   SessionProgress,
@@ -66,6 +67,7 @@ function IdentityShellContent({
   const pathname = usePathname();
   const router = useRouter();
   const [logoutState, setLogoutState] = useState<'idle' | 'pending'>('idle');
+  const commands = useCommands();
   const search = useSearchParams();
   const current = useQuery({
     queryKey: currentUserKey(identity.userId, identity.workspaceId),
@@ -90,6 +92,7 @@ function IdentityShellContent({
             disabled={logoutState === 'pending'}
             className="min-h-11 rounded-lg border border-line px-4 py-2"
             onClick={async () => {
+              if (!(commands?.canLeave() ?? true)) return;
               setLogoutState('pending');
               try {
                 await coordinator.logout();

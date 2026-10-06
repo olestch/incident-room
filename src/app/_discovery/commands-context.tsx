@@ -16,6 +16,8 @@ const CommandsContext = createContext<{
   openPalette: () => void;
   registerThread: (callback: () => void) => () => void;
   closeThread: () => void;
+  registerLeave: (callback: () => boolean) => () => void;
+  canLeave: () => boolean;
   readNotice: boolean;
   announceReadFailure: () => void;
   dismissReadNotice: () => void;
@@ -26,6 +28,14 @@ export function CommandsProvider({ children }: { children: ReactNode }) {
   const announceReadFailure = useCallback(() => setReadNotice(true), []);
   const dismissReadNotice = useCallback(() => setReadNotice(false), []);
   const port = useRef<(() => void) | null>(null);
+  const leave = useRef<(() => boolean) | null>(null);
+  const registerLeave = useCallback((callback: () => boolean) => {
+    leave.current = callback;
+    return () => {
+      if (leave.current === callback) leave.current = null;
+    };
+  }, []);
+  const canLeave = useCallback(() => leave.current?.() ?? true, []);
   const pending = useRef(false);
   const palette = useRef<(() => void) | null>(null),
     thread = useRef<(() => void) | null>(null);
@@ -54,12 +64,13 @@ export function CommandsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
   const create = useCallback(() => {
+    if (!canLeave()) return;
     if (port.current) port.current();
     else {
       pending.current = true;
       router.push('/app/incidents');
     }
-  }, [router]);
+  }, [router, canLeave]);
   const value = useMemo(
     () => ({
       registerCreate,
@@ -68,6 +79,8 @@ export function CommandsProvider({ children }: { children: ReactNode }) {
       openPalette,
       registerThread,
       closeThread,
+      registerLeave,
+      canLeave,
       readNotice,
       announceReadFailure,
       dismissReadNotice,
@@ -79,6 +92,8 @@ export function CommandsProvider({ children }: { children: ReactNode }) {
       openPalette,
       registerThread,
       closeThread,
+      registerLeave,
+      canLeave,
       readNotice,
       announceReadFailure,
       dismissReadNotice,

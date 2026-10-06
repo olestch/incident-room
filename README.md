@@ -2,11 +2,21 @@
 
 Incident Room is a public portfolio project for coordinating technical incidents. Dedicated incident rooms will combine operational context, a realtime timeline, contextual discussions, and postmortem documentation using fictional, deterministic data.
 
-**Current status:** Phase 7 Search, Notifications and Command Palette implemented, alongside Phases 1–6. Search returns bounded authority-owned Incident, Timeline human-message, Thread-message and workspace-user results with canonical destinations. Persistent recipient notifications and read state extend the existing journal/resync. The accessible command dialog supports safe navigation, existing creation, contextual Thread close and bounded Incident lookup. Production WebSocket infrastructure, Postmortem/Action Items and visible Demo Mode remain future work.
+**Current status:** Phases 1–8 implemented, including structured Postmortems and revision-safe Action Items. Explicit Save, stale-edit conflicts, preserved dirty forms and existing realtime/resync support shared drafts on Resolved incidents. Search, recipient Notifications and the accessible Command Palette retain their Phase 7 scope. Visible Demo Mode / portfolio polish remain next; production WebSocket infrastructure is not implemented.
 
 The accepted [Product Specification](docs/product-spec.md) defines product behavior. [Technical Architecture](docs/technical-architecture.md) defines ownership, runtime boundaries, persistence, realtime, and testing decisions. The accepted Phase 0 document is preserved unchanged, including its historical implementation-status marker.
 
-## Development
+## Postmortem and Action Items
+
+Resolved Incident Rooms expose Create/Edit/View Postmortem at `/app/incidents/:number/postmortem` (try INC-2865 for River commander/Sage participant; INC-2845 for River commander/Sage read-only). Commander/admin initiate one shared draft; participants/commander/admin edit; active workspace members view. Summary, Impact, Root Cause and Resolution are plain-text sections with explicit Save; Timeline contains up to 100 chronological source references, including tombstones. Removing a reference never deletes a source. Browse source choices in bounded 60-entry pages.
+
+Every document and Action Item save checks its own expected revision. Newer confirmed edits never silently overwrite dirty fields. Review latest, then explicitly Reload latest with confirmation; a transient local reference copy remains on the page for manual copying. No automatic merge, autosave, version history, publish/approval workflow, durable Postmortem drafts or message outbox reuse. Native reload/close, app links, command navigation and sign-out warn before losing unsaved edits; browser-owned same-document Back/Forward is not intercepted by a global history framework.
+
+Action Items have title, optional description/active-user assignee/date-only due date, and Open/In progress/Done status. Any explicit transition is allowed; deletion is omitted. Each Postmortem is capped at 200 items. Assignment changes and Postmortem initiation reuse the existing recipient notifications; ordinary text/status saves do not spam notifications. Reconnect/expired snapshots converge confirmed Query state while dirty form text stays intact. This is a fictional server-backed ordinary edit/save model, not offline-first collaborative editing. The latest Phase 8 task explicitly extends the accepted spec's initial text-only Action Items with these fields; the Product Specification is unchanged. Search scope is unchanged.
+
+Local validation boundary: this Windows host's unchanged six-worker runs exhibited intermittent old realtime/Thread startup/resync timeouts. A timeout also reproduced against Phase 7's application/test sources (`2e528b5`), so it is not claimed to be a Phase 8 fix. All new Phase 8 browser scenarios pass at six workers. The full suite also passes at the repository's existing CI concurrency (two workers), with retries explicitly disabled for this diagnostic. No worker/retry/timeout, assertion or CI configuration was changed. Actual GitHub Actions still requires an authorized push and observation of that exact commit.
+
+## Development setup
 
 Use Node.js 24 and pnpm 11.19.0 (pinned in `package.json`). Install pnpm through your preferred package-manager setup, or use `corepack prepare pnpm@11.19.0 --activate` where Corepack is available.
 

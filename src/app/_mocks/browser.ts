@@ -19,6 +19,11 @@ import { notificationHandlers } from '@/features/notifications/handlers';
 import { composeNotificationIngestion } from './notification-ingestion';
 import { composeSearchAuthority } from './search-authority';
 import { searchHandlers } from '@/features/search/handlers';
+import { MockPostmortemAuthority, makePostmortemStore } from '@/features/postmortem/authority';
+import { postmortemHandlers } from '@/features/postmortem/handlers';
+import { composePostmortemIngestion } from './postmortem-ingestion';
+import { compareEntries } from '@/entities/timeline/model';
+import { AppError } from '@/shared/errors/app-error';
 
 let startup: Promise<void> | null = null;
 export function startMock() {
@@ -59,7 +64,31 @@ export function startMock() {
         record,
         notificationIngestion,
       );
+    const postmortems = new MockPostmortemAuthority(makePostmortemStore(), (actor, record, ids) =>
+      timeline.inspectSearchable(actor, record, (entries) => {
+        const selected = entries.filter((entry) => ids.includes(entry.id));
+        if (selected.length !== ids.length)
+          throw new AppError('validation', 'A selected Timeline entry is unavailable.', 400);
+        return selected.sort(compareEntries).map((entry) => entry.id);
+      }),
+    );
+    const publishPostmortems = composePostmortemIngestion(
+      postmortems,
+      journal,
+      notificationIngestion,
+    );
     const worker = setupWorker(
+      ...postmortemHandlers(
+        postmortems,
+        authenticate,
+        (actor, number) => incidents.detail(actor, number),
+        () => auth.users(),
+        publishPostmortems,
+        (actor, record, ids) =>
+          timeline.inspectSearchable(actor, record, (entries) =>
+            entries.filter((entry) => ids.includes(entry.id)).sort(compareEntries),
+          ),
+      ),
       ...notificationHandlers(notifications, authenticate, notificationIngestion.publish),
       ...searchHandlers(
         composeSearchAuthority(incidents, timeline, threads, () => auth.users()),
@@ -106,6 +135,7 @@ export function startMock() {
         },
         threads,
         notificationIngestion,
+        publishPostmortems,
       ),
     );
     startup = worker

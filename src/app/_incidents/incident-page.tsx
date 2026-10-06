@@ -37,6 +37,7 @@ import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { AppError } from '@/shared/errors/app-error';
 import { TimelineRoom } from './timeline-room';
 import { useCommands } from '@/app/_discovery/commands-context';
+import { PostmortemEntry } from '@/app/_postmortem/entry';
 
 export function IncidentPage({ number }: { number?: string }) {
   const { state } = useSessionRuntime();
@@ -234,7 +235,10 @@ function IdentityIncidentPage({
               users.data &&
               !inaccessible(detail.error) &&
               !inaccessible(users.error) && (
-                <IncidentContext incident={detail.data} users={users.data} detail />
+                <>
+                  <IncidentContext incident={detail.data} users={users.data} detail />
+                  {current.data && <PostmortemEntry incident={detail.data} actor={current.data} />}
+                </>
               )}
           </div>
           {detail.data &&

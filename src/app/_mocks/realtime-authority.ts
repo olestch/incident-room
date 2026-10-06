@@ -75,6 +75,7 @@ export function composeRealtimeAuthority(
   authenticate: (client: string) => Promise<IncidentActor>,
   threads: MockThreadAuthority,
   notifications?: NotificationIngestion,
+  ingestPostmortems?: (actor: IncidentActor) => Promise<void>,
 ) {
   const ingestMetadata = async (actor: IncidentActor) => {
     const metadata = await incidents.changes(actor);
@@ -134,13 +135,17 @@ export function composeRealtimeAuthority(
     );
   };
   return [
-    ...workspaceRealtimeHandlers(journal, authenticate, ingestMetadata),
+    ...workspaceRealtimeHandlers(journal, authenticate, async (actor) => {
+      await ingestMetadata(actor);
+      await ingestPostmortems?.(actor);
+    }),
     ...realtimeHandlers(
       journal,
       authenticate,
       (actor, number) => incidents.detail(actor, number),
       async (actor, incident) => {
         await ingestMetadata(actor);
+        await ingestPostmortems?.(actor);
         await ingestRoomChanges(
           journal,
           incidents,

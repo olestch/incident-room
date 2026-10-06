@@ -9,6 +9,8 @@ import { MockRealtimeTransport } from '@/features/realtime/mock-transport';
 import { openSchema, streamSchema, syncSchema } from '@/features/realtime/protocol';
 import { notificationKeys } from '@/entities/notification/model';
 import { applyNotification } from '@/app/_discovery/notification-cache';
+import { applyPostmortemEvent } from '@/app/_postmortem/cache';
+import { postmortemKeys } from '@/entities/postmortem/model';
 
 /** The authorized list watches workspace metadata only, with no incident presence subscription. */
 export function useListRealtime(enabled: boolean, userId: string, workspaceId: string) {
@@ -43,6 +45,7 @@ export function useListRealtime(enabled: boolean, userId: string, workspaceId: s
         read(`/sync?after=${after}&boundary=${boundary}`, syncSchema, signal),
       snapshot: async (signal) => {
         await cache.invalidateQueries({ queryKey: notificationKeys.all(userId, workspaceId) });
+        await cache.invalidateQueries({ queryKey: postmortemKeys.all(userId, workspaceId) });
         await cache.invalidateQueries({ queryKey: incidentKeys.all(userId, workspaceId) });
         signal.throwIfAborted();
         if (!valid()) throw new DOMException('Superseded identity', 'AbortError');
@@ -52,6 +55,7 @@ export function useListRealtime(enabled: boolean, userId: string, workspaceId: s
       apply: async (event, signal) => {
         signal.throwIfAborted();
         if (!valid()) throw new DOMException('Superseded identity', 'AbortError');
+        if (await applyPostmortemEvent(cache, userId, workspaceId, event, signal)) return;
         if (event.resourceType === 'notification') {
           if (event.payload.notification.recipientUserId === userId)
             applyNotification(

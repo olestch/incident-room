@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { queryScope } from '@/shared/query/query-scope';
 export const notificationTargetSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('postmortem'), number: z.string().regex(/^INC-\d+$/) }),
   z.object({ type: z.literal('incident'), number: z.string().regex(/^INC-\d+$/) }),
   z.object({
     type: z.literal('timeline'),
@@ -25,6 +26,8 @@ export const notificationSchema = z.object({
     'severity_changed',
     'status_changed',
     'thread_reply',
+    'postmortem_initiated',
+    'action_item_assigned',
   ]),
   createdAt: z.iso.datetime(),
   readAt: z.iso.datetime().nullable(),
@@ -71,6 +74,7 @@ export const mergeUnread = (previous: UnreadSummary | undefined, next: UnreadSum
 export function notificationDestination(notification: Notification) {
   const target = notification.target;
   const path = `/app/incidents/${target.number}`;
+  if (target.type === 'postmortem') return `${path}/postmortem`;
   if (target.type === 'incident') return path;
   return `${path}?${new URLSearchParams(target.type === 'timeline' ? { event: target.entry } : { thread: target.root, message: target.message })}`;
 }

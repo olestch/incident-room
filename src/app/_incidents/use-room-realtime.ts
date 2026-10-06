@@ -1,6 +1,8 @@
 'use client';
 import { applyNotification } from '@/app/_discovery/notification-cache';
+import { applyPostmortemEvent } from '@/app/_postmortem/cache';
 import { notificationKeys } from '@/entities/notification/model';
+import { postmortemKeys } from '@/entities/postmortem/model';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   threadKeys,
@@ -147,6 +149,7 @@ export function useRoomRealtime(
       apply: async (event, signal) => {
         signal.throwIfAborted();
         if (!valid()) throw new DOMException('Room disposed', 'AbortError');
+        if (await applyPostmortemEvent(cache, actor.id, actor.workspaceId, event, signal)) return;
         if (event.resourceType === 'notification') {
           if (event.payload.notification.recipientUserId === actor.id)
             applyNotification(
@@ -218,6 +221,7 @@ export function useRoomRealtime(
           }
           return;
         }
+        if (event.resourceType !== 'timeline') return;
         const existed = known(event.resourceId);
         merge(event.payload);
         await delivery.acknowledge(event.payload);
@@ -234,6 +238,9 @@ export function useRoomRealtime(
         }
       },
       snapshot: async (signal) => {
+        await cache.invalidateQueries({
+          queryKey: postmortemKeys.all(actor.id, actor.workspaceId),
+        });
         await cache.invalidateQueries({
           queryKey: notificationKeys.all(actor.id, actor.workspaceId),
         });
