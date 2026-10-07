@@ -3,6 +3,9 @@ import type { WorkspaceUser } from '@/entities/current-user/model';
 import { replyPreview, type ThreadMessage } from '@/entities/thread/model';
 import type { OutboxRecord } from '@/shared/messaging/local-work';
 import { SafeText } from '@/shared/ui/safe-text';
+import { MessageSquare, Trash2 } from 'lucide-react';
+import { Avatar, Button } from '@/shared/ui/primitives';
+import { LocalMessage, StreamTime } from '@/shared/ui/message-presentation';
 export function ReplyReference({
   id,
   index,
@@ -40,7 +43,7 @@ export function ThreadMessageContent({
   navigate(id: string): void;
 }) {
   return (
-    <>
+    <div className={`thread-message ${message.replyToMessageId ? 'thread-message-reply' : ''}`}>
       {message.replyToMessageId && (
         <ReplyReference
           id={message.replyToMessageId}
@@ -50,29 +53,37 @@ export function ThreadMessageContent({
         />
       )}
       {message.tombstone ? (
-        <>
-          <strong>Deleted message</strong>
-          <p>{message.tombstone.reason}</p>
-        </>
+        <div className="stream-tombstone">
+          <Trash2 size={16} aria-hidden="true" />
+          <div>
+            <strong>Deleted message</strong>
+            <p>{message.tombstone.reason}</p>
+          </div>
+        </div>
       ) : (
         <>
-          <strong>
-            {users.find((u) => u.id === message.authorId)?.name ?? 'Workspace member'}
-          </strong>
-          <p className="whitespace-pre-wrap">
+          <div className="stream-message-heading">
+            <Avatar
+              name={users.find((u) => u.id === message.authorId)?.name ?? 'Workspace member'}
+            />
+            <strong>
+              {users.find((u) => u.id === message.authorId)?.name ?? 'Workspace member'}
+            </strong>
+            <StreamTime value={message.occurredAt} />
+          </div>
+          <p className="stream-body">
             <SafeText text={message.body} />
           </p>
         </>
       )}
-      <time className="text-xs text-muted" dateTime={message.occurredAt}>
-        {new Date(message.occurredAt).toLocaleString()}
-      </time>
+      {message.tombstone && <StreamTime value={message.occurredAt} />}
       {writable && (
-        <button className="incident-button ml-2" onClick={() => reply(message.id)}>
+        <Button variant="quiet" className="stream-discuss" onClick={() => reply(message.id)}>
+          <MessageSquare size={14} aria-hidden="true" />
           Reply
-        </button>
+        </Button>
       )}
-    </>
+    </div>
   );
 }
 export function PendingReply({
@@ -89,39 +100,13 @@ export function PendingReply({
   remove(id: string): void;
 }) {
   return (
-    <>
-      <strong>
-        Your reply ·{' '}
-        {record.state === 'unknown'
-          ? 'Checking delivery'
-          : record.state === 'sending'
-            ? 'Sending'
-            : 'Failed'}
-      </strong>
-      <p className="whitespace-pre-wrap">
-        <SafeText text={record.body} />
-      </p>
-      {record.replyToMessageId && <p>Reply reference: {record.replyToMessageId}</p>}
-      {record.issue && <p>{record.issue}</p>}
-      {record.state === 'unknown' && (
-        <button className="incident-button" onClick={() => check(record.clientMutationId)}>
-          Check delivery
-        </button>
-      )}
-      {record.state === 'failed' && (
-        <div>
-          <button
-            className="incident-button"
-            disabled={!writable || !record.retryAllowed}
-            onClick={() => retry(record.clientMutationId)}
-          >
-            Retry reply
-          </button>
-          <button className="incident-button" onClick={() => remove(record.clientMutationId)}>
-            Delete local reply
-          </button>
-        </div>
-      )}
-    </>
+    <LocalMessage
+      record={record}
+      retry={retry}
+      check={check}
+      remove={remove}
+      writable={writable}
+      reply
+    />
   );
 }

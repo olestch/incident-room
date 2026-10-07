@@ -23,6 +23,7 @@ import {
   type TimelineWindow,
 } from '@/entities/timeline/model';
 import { DeliveryCoordinator } from '@/features/timeline/delivery';
+import { useMessageDelivery } from '@/shared/messaging/use-message-delivery';
 import { TimelineProjection } from '@/features/timeline/projection';
 import { TimelineCompose, TimelineList } from '@/features/timeline/views';
 import { TargetNavigation, type TimelineViewport } from '@/features/timeline/target-navigation';
@@ -32,7 +33,7 @@ import { AppError } from '@/shared/errors/app-error';
 import { useAppDispatch } from '@/app/_providers/hooks';
 import { useLocalWork, useSessionRuntime } from '@/app/_providers/session-provider';
 import { useRoomRealtime } from './use-room-realtime';
-import { RealtimeSummary } from '@/features/realtime/views';
+import { RealtimeSummary, TimelineTyping } from '@/features/realtime/views';
 import { parseThreadLocation, threadHref } from '@/entities/thread/navigation';
 import { ThreadSummary } from './thread-summary';
 import { ThreadSurface } from './thread-surface';
@@ -103,7 +104,7 @@ export function TimelineRoom({
     },
     [cache, scope],
   );
-  const delivery = useMemo(
+  const createDelivery = useCallback(
     () =>
       new DeliveryCoordinator(work, lease, {
         changed: (value) => {
@@ -146,6 +147,7 @@ export function TimelineRoom({
       }),
     [work, lease, dispatch, scope, acknowledge, coordinator, adapter, root, cache],
   );
+  const delivery = useMessageDelivery(createDelivery);
   const history = useInfiniteQuery({
     queryKey: key,
     initialPageParam: null as string | null,
@@ -269,7 +271,6 @@ export function TimelineRoom({
     return () => {
       active = false;
       clearTimeout(deadline);
-      delivery.dispose();
       navigation.cancel();
       window.removeEventListener('pagehide', pagehide);
       void flush().catch(() => {});
@@ -379,12 +380,10 @@ export function TimelineRoom({
           Thread message link requires a root Thread. The Timeline remains available.
         </p>
       )}
-      <section ref={timelineSection} aria-labelledby="timeline-heading" className="min-w-0">
-        <div className="flex flex-wrap justify-between gap-2 my-3">
-          <h2 id="timeline-heading" className="text-xl font-semibold">
-            Timeline
-          </h2>
-          <button className="incident-button" onClick={goLatest}>
+      <section ref={timelineSection} aria-labelledby="timeline-heading" className="room-timeline">
+        <div className="room-stream-heading">
+          <h2 id="timeline-heading">Timeline</h2>
+          <button className="incident-button room-latest" onClick={goLatest}>
             Go to latest
           </button>
         </div>
@@ -470,6 +469,7 @@ export function TimelineRoom({
           }}
         />
         {!writable && issue && <p role="alert">{issue}</p>}
+        <TimelineTyping members={realtime.members} users={users} userId={actor.id} />
         <TimelineCompose
           body={body}
           edit={edit}

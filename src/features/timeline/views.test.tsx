@@ -2,7 +2,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { installVirtualLayout } from '@/shared/testing/virtual-layout';
-import { EntryContent, LocalEntry, SafeText, TimelineCompose, TimelineList } from './views';
+import {
+  RoomEntryContent as EntryContent,
+  LocalEntry,
+  SafeText,
+  TimelineCompose,
+  TimelineList,
+  ThreadRootPreview,
+} from './views';
 import { generateTimeline } from './fixtures';
 import { outboxSchema } from './local-work';
 
@@ -23,6 +30,48 @@ const compose = {
   resolved: false,
   issue: null,
 };
+it('Thread root is a bounded source excerpt and hides tombstoned content', () => {
+  const entry = {
+    ...generateTimeline('room', 1)[0]!,
+    type: 'human_message' as const,
+    authorId: 'river',
+    body: 'Context '.repeat(100),
+  };
+  const { rerender } = render(<ThreadRootPreview entry={entry} users={[]} />);
+  expect(screen.getByText('Workspace member')).toBeVisible();
+  expect(screen.queryByText(entry.body)).toBeNull();
+  expect(screen.getByText(/Context Context/).textContent!.length).toBeLessThanOrEqual(241);
+  rerender(
+    <ThreadRootPreview
+      entry={{ ...entry, tombstone: { deletedAt: entry.createdAt, reason: 'withdrawn' } }}
+      users={[]}
+    />,
+  );
+  expect(screen.getByText('Deleted entry')).toBeVisible();
+  expect(screen.queryByText(/Context Context/)).toBeNull();
+});
+it('mention selection preserves the plain-text stable identity, excludes inactive users and restores editor focus', async () => {
+  const edit = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, 'hidePopover', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  render(
+    <TimelineCompose
+      {...compose}
+      edit={edit}
+      body="Draft"
+      users={[
+        { id: 'sage', name: 'Sage Linden', status: 'active' },
+        { id: 'inactive', name: 'Inactive person', status: 'deactivated' },
+      ]}
+    />,
+  );
+  expect(screen.queryByRole('option', { name: 'Inactive person' })).toBeNull();
+  await userEvent.setup().selectOptions(screen.getByLabelText('Mention workspace user'), 'sage');
+  expect(edit).toHaveBeenCalledWith('Draft @Sage Linden [sage] ');
+  expect(screen.getByLabelText('Message')).toHaveFocus();
+});
 it('renders all entry sources with textual semantics; tombstone never exposes removed body', () => {
   const entries = generateTimeline('room', 7);
   const { rerender } = render(
@@ -120,6 +169,9 @@ it('failed optimistic actions use the same mutation identity and unknown permits
   expect(screen.queryByRole('button', { name: 'Retry message' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Delete local message' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Check delivery' })).toBeVisible();
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Delivery is uncertain. Check before retrying.',
+  );
 });
 it('real TanStack Virtual renders a bounded measured subset of a 10,000-row projection', async () => {
   const rows = generateTimeline('room', 10000).map((entry) => ({ key: entry.id, entry }));

@@ -65,6 +65,8 @@ test('disconnect, persist missed activity, and reconnect through real resync', a
   expect(errors).toEqual([]);
 });
 test('confirmed 50k dataset uses bounded DOM and reloadable old target', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
   await login(page);
   await controls(page);
   await page.getByLabel('Timeline stress size').selectOption('50000');
@@ -79,11 +81,18 @@ test('confirmed 50k dataset uses bounded DOM and reloadable old target', async (
   await expect(page.locator('[data-entry-id]').first()).toBeVisible();
   expect(await page.locator('[data-entry-id]').count()).toBeLessThan(80);
   await expect(page.locator('[data-entry-id="fictional-incident-2841:evt-50000"]')).toBeVisible();
+  const viewport = page.getByLabel('Timeline viewport', { exact: true });
+  await viewport.press('Home');
+  await expect(page.locator('[data-entry-id]').first()).toBeVisible();
+  expect(await page.locator('[data-entry-id]').count()).toBeLessThan(80);
+  await viewport.press('End');
+  await expect(page.locator('[data-entry-id="fictional-incident-2841:evt-50000"]')).toBeVisible();
   await page.goto(
     '/app/incidents/INC-2841?event=fictional-incident-2841:evt-42&thread=fictional-incident-2841:evt-42',
   );
   await expect(page.getByRole('heading', { name: 'Thread', exact: true })).toBeVisible();
   expect(await page.locator('[data-entry-id]').count()).toBeLessThan(160);
+  expect(errors).toEqual([]);
 });
 test('reset restores seed, clears generated persistent work and requires single app tab', async ({
   page,

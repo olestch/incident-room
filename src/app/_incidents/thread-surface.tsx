@@ -25,6 +25,7 @@ import {
 } from '@/entities/thread/model';
 import { threadHref } from '@/entities/thread/navigation';
 import { ThreadDelivery } from '@/features/threads/delivery';
+import { useMessageDelivery } from '@/shared/messaging/use-message-delivery';
 import { ThreadProjection } from '@/features/threads/projection';
 import { PendingReply, ReplyReference, ThreadMessageContent } from '@/features/threads/views';
 import type { PresenceMember } from '@/features/realtime/protocol';
@@ -35,7 +36,8 @@ import { MeasuredStream } from '@/shared/ui/measured-stream';
 import { StreamCompose } from '@/shared/ui/stream-compose';
 import { AppError } from '@/shared/errors/app-error';
 import { useLocalWork, useSessionRuntime } from '@/app/_providers/session-provider';
-import { EntryContent } from '@/features/timeline/views';
+import { ThreadRootPreview } from '@/features/timeline/views';
+import { MessageSquare, X, Radio, WifiOff } from 'lucide-react';
 import type { ActiveThreadPort } from './use-room-realtime';
 import { hasAcquiredThreadMessage } from './thread-cache';
 
@@ -174,7 +176,7 @@ export function ThreadSurface({
     },
     [cache, scope, root, created],
   );
-  const delivery = useMemo(
+  const createDelivery = useCallback(
     () =>
       new ThreadDelivery(work, lease, {
         changed: setRecords,
@@ -207,6 +209,7 @@ export function ThreadSurface({
       }),
     [work, lease, acknowledge, cache, scope, coordinator, adapter, api, messageSchema, read],
   );
+  const delivery = useMessageDelivery(createDelivery);
   const history = useInfiniteQuery({
     queryKey: key,
     initialPageParam: null as string | null,
@@ -314,7 +317,6 @@ export function ThreadSurface({
     return () => {
       active = false;
       clearTimeout(deadline);
-      delivery.dispose();
       navigation.cancel();
       typing(false, root);
       window.removeEventListener('pagehide', pagehide);
@@ -439,9 +441,11 @@ export function ThreadSurface({
           closeSafely();
         }
         if (event.key === 'Tab' && window.matchMedia('(max-width: 63.99rem)').matches) {
-          const nodes = surface.current?.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]',
-          );
+          const nodes = [
+            ...(surface.current?.querySelectorAll<HTMLElement>(
+              'button:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]',
+            ) ?? []),
+          ].filter((node) => node.getClientRects().length > 0);
           if (!nodes?.length) return;
           const first = nodes[0]!,
             last = nodes[nodes.length - 1]!;
@@ -455,8 +459,9 @@ export function ThreadSurface({
         }
       }}
     >
-      <header className="flex flex-wrap justify-between gap-2">
-        <h2 id="thread-heading" className="text-xl font-semibold">
+      <header className="room-stream-heading">
+        <h2 id="thread-heading">
+          <MessageSquare size={18} aria-hidden="true" />
           Thread
         </h2>
         {appCommands && (
@@ -464,13 +469,22 @@ export function ThreadSurface({
             Thread commands
           </button>
         )}
-        <button data-thread-close className="incident-button" onClick={closeSafely}>
-          Back to Timeline / Close Thread
+        <button
+          data-thread-close
+          className="incident-button thread-close"
+          onClick={closeSafely}
+          aria-label="Back to Timeline / Close Thread"
+          title="Close Thread"
+        >
+          <X size={18} aria-hidden="true" />
+          <span>Close</span>
         </button>
       </header>
       <div className="thread-root">
-        <p className="text-xs text-muted">Root: {root}</p>
-        {rootQuery.data && <EntryContent entry={rootQuery.data as TimelineEntry} users={users} />}
+        <p className="thread-root-label">Discussion of Timeline entry · {root}</p>
+        {rootQuery.data && (
+          <ThreadRootPreview entry={rootQuery.data as TimelineEntry} users={users} />
+        )}
         <button
           className="incident-button"
           onClick={() => {
@@ -487,7 +501,16 @@ export function ThreadSurface({
           View root in Timeline
         </button>
       </div>
-      <p aria-label="Thread connection" role="status">
+      <p
+        className={`room-connection room-connection-${status}`}
+        aria-label="Thread connection"
+        role="status"
+      >
+        {status === 'offline' ? (
+          <WifiOff size={14} aria-hidden="true" />
+        ) : (
+          <Radio size={14} aria-hidden="true" />
+        )}
         {status === 'connected'
           ? 'Connected'
           : status === 'offline'
@@ -605,7 +628,7 @@ export function ThreadSurface({
           ) : null;
         }}
       />
-      <p aria-label="Thread typing">
+      <p className="room-typing" aria-label="Thread typing">
         {typers.length > 2
           ? `${typers.length} people are typing in this Thread…`
           : typers.length

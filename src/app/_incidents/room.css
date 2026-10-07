@@ -1,0 +1,609 @@
+.incident-room {
+  min-width: 0;
+}
+.incident-room .incident-room-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.incident-room .room-loading {
+  grid-column: 1 / -1;
+}
+.incident-command-strip {
+  padding: 1rem 0 1.25rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.room-identity,
+.room-command-metadata,
+.room-command-metadata > span,
+.room-person,
+.room-people li,
+.room-services,
+.stream-transition,
+.stream-message-heading,
+.stream-event-heading,
+.stream-important,
+.stream-delivery,
+.stream-local-actions,
+.room-connection,
+.presence-avatars,
+.room-stream-heading,
+.compose-actions,
+.mention-picker-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.room-identity,
+.room-command-metadata,
+.room-services,
+.stream-transition,
+.stream-event-heading,
+.stream-message-heading,
+.stream-local-actions,
+.room-stream-heading,
+.compose-actions {
+  flex-wrap: wrap;
+}
+.room-number {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+  margin-right: 0.25rem;
+}
+.incident-command-strip h1 {
+  font-size: var(--text-page);
+  line-height: var(--text-page--line-height);
+  font-weight: 650;
+  margin: 0.625rem 0;
+  overflow-wrap: anywhere;
+}
+.room-command-metadata {
+  gap: 0.5rem 1.25rem;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.room-command-metadata > span {
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.room-command-metadata svg {
+  flex-shrink: 0;
+}
+.room-context-rail {
+  min-width: 0;
+  font-size: var(--text-meta);
+  color: var(--color-secondary);
+}
+.room-context-rail summary {
+  min-height: 2.75rem;
+  padding: 0.75rem 0.25rem;
+  cursor: pointer;
+  color: var(--color-ink);
+  font-size: var(--text-control);
+  font-weight: 600;
+}
+.room-context-content {
+  padding: 0.5rem 0.25rem 1rem;
+}
+.room-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+.room-context-rail dt {
+  color: var(--color-muted);
+  font-size: var(--text-time);
+  margin: 1rem 0 0.375rem;
+}
+.room-context-rail dd {
+  overflow-wrap: anywhere;
+}
+.room-people {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.room-context-rail .ui-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.625rem;
+  flex-shrink: 0;
+}
+.room-services > span {
+  padding: 0.25rem 0.5rem;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-small);
+}
+.room-timeline {
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+}
+.room-stream-heading {
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.room-stream-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-section);
+  line-height: var(--text-section--line-height);
+  font-weight: 650;
+}
+.incident-room .room-latest,
+.incident-room .thread-close {
+  border-color: transparent;
+  padding: 0.375rem 0.5rem;
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.room-realtime {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.625rem 1rem;
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-line);
+}
+.room-connection {
+  font-size: var(--text-meta);
+  min-height: 1.75rem;
+}
+.room-connection-connected {
+  color: var(--color-accent);
+}
+.room-connection-offline,
+.room-connection-reconnecting {
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-small);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.room-realtime summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  cursor: pointer;
+  min-height: 2rem;
+}
+.presence-avatars {
+  gap: 0.125rem;
+}
+.presence-avatars .ui-avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.6rem;
+}
+.room-realtime details p {
+  padding: 0.5rem 0;
+}
+.incident-room .room-timeline > p:not(.room-typing),
+.incident-room .room-timeline > div[role='alert'] {
+  margin: 0.5rem 1rem;
+  font-size: var(--text-meta);
+}
+.incident-room .room-timeline > .incident-button {
+  margin: 0.5rem 1rem;
+  font-size: var(--text-meta);
+}
+.incident-room .timeline-viewport {
+  border: 0;
+  border-radius: 0;
+  height: min(58dvh, 46rem);
+  min-height: 12rem;
+}
+.incident-room .timeline-row {
+  padding: 0;
+  border-bottom: 0;
+}
+.chronology-event {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  padding: 0 1rem 0 0.5rem;
+}
+.chronology-marker {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 1.125rem;
+  color: var(--color-muted);
+  background: linear-gradient(var(--color-line), var(--color-line)) center / 1px 100% no-repeat;
+}
+.chronology-marker svg {
+  box-sizing: content-box;
+  padding: 0.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+.chronology-human_message .chronology-marker {
+  color: var(--color-accent);
+}
+.chronology-monitoring_event .chronology-marker {
+  color: var(--color-warning);
+}
+.chronology-content {
+  min-width: 0;
+  padding: 1rem 0.25rem 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.chronology-participant_event .chronology-content,
+.chronology-system_event .chronology-content {
+  padding-top: 0.875rem;
+  padding-bottom: 0.5rem;
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+}
+.stream-message-heading,
+.stream-event-heading {
+  gap: 0.375rem 0.625rem;
+  font-size: var(--text-control);
+}
+.stream-message-heading strong {
+  font-weight: 650;
+}
+.stream-message-heading .ui-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.625rem;
+  flex-shrink: 0;
+}
+.stream-time {
+  color: var(--color-muted);
+  font-size: var(--text-time);
+  font-weight: 400;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.stream-body {
+  white-space: pre-wrap;
+  font-size: var(--text-body);
+  line-height: 1.55;
+  margin: 0.625rem 0 0.25rem;
+  max-width: 76ch;
+  overflow-wrap: anywhere;
+}
+.stream-event-body {
+  font-size: var(--text-control);
+  color: var(--color-secondary);
+  margin-top: 0.375rem;
+  max-width: 76ch;
+}
+.stream-signal {
+  padding: 0.625rem 0.75rem;
+  margin-top: 0.5rem;
+  border-left: 2px solid var(--color-warning);
+  background: var(--color-surface-secondary);
+  font-size: var(--text-control);
+  max-width: 76ch;
+}
+.stream-transition {
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.stream-actor {
+  font-size: var(--text-time);
+}
+.stream-important {
+  font-size: var(--text-time);
+  color: var(--color-warning);
+  margin-bottom: 0.375rem;
+  font-weight: 600;
+}
+.stream-tombstone {
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+}
+.stream-tombstone p {
+  margin: 0.25rem 0;
+}
+.incident-room .thread-summary {
+  margin-top: 0.25rem;
+}
+.stream-discuss.ui-button {
+  font-size: var(--text-meta);
+  padding: 0.25rem 0.5rem;
+  gap: 0.375rem;
+  margin-left: -0.5rem;
+}
+.stream-delivery,
+.stream-reference-note {
+  font-size: var(--text-meta);
+  color: var(--color-muted);
+  margin: 0.375rem 0;
+}
+.stream-local-failed .stream-delivery {
+  color: var(--color-danger);
+}
+.stream-local-unknown .stream-delivery {
+  color: var(--color-warning);
+}
+.stream-local-actions:empty {
+  display: none;
+}
+.stream-local-actions .ui-button {
+  font-size: var(--text-meta);
+}
+.incident-room .stream-target-label {
+  padding: 0.5rem 1rem;
+  border-left: 4px solid var(--color-focus);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  background: var(--color-info-soft);
+}
+.incident-room .timeline-target {
+  background: var(--color-info-soft);
+  box-shadow: inset 3px 0 var(--color-focus);
+  outline: 1px solid var(--color-focus);
+  outline-offset: -1px;
+}
+.incident-room .timeline-target .chronology-marker svg {
+  background: var(--color-info-soft);
+}
+.incident-room .stream-new-updates {
+  display: block;
+  margin: 0.5rem auto;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  font-size: var(--text-meta);
+}
+.room-typing {
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+  min-height: 1.5rem;
+  padding: 0.25rem 1rem;
+}
+.incident-room .timeline-compose {
+  padding: 0.75rem 1rem max(1rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface-secondary);
+}
+.compose-label {
+  display: block;
+  font-size: var(--text-control);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.compose-editor {
+  font-size: var(--text-body);
+  resize: vertical;
+  line-height: 1.5;
+}
+.compose-help {
+  font-size: var(--text-time);
+  color: var(--color-muted);
+  margin: 0.5rem 0;
+}
+.compose-actions {
+  gap: 0.25rem 0.5rem;
+}
+.compose-actions .ui-button {
+  font-size: var(--text-meta);
+}
+.compose-actions .ui-button-primary {
+  margin-left: auto;
+}
+.compose-draft {
+  color: var(--color-muted);
+  font-size: var(--text-time);
+}
+.mention-picker {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--elevation-overlay);
+}
+.mention-picker::backdrop {
+  background: var(--overlay-scrim);
+}
+.mention-picker-heading {
+  justify-content: space-between;
+  font-size: var(--text-control);
+  margin-bottom: 0.5rem;
+}
+.mention-picker label {
+  font-size: var(--text-meta);
+}
+.mention-picker select {
+  margin-top: 0.375rem;
+}
+.incident-room .thread-surface {
+  padding: 0;
+  border-radius: var(--radius-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.incident-room .thread-surface > p,
+.incident-room .thread-surface > div[role='alert'],
+.incident-room .thread-surface > .incident-button,
+.incident-room .thread-surface > div.flex {
+  margin: 0 1rem;
+  font-size: var(--text-meta);
+}
+.incident-room .thread-surface .room-stream-heading {
+  flex-shrink: 0;
+}
+.incident-room .thread-root {
+  margin: 0 1rem;
+  padding: 0.5rem 0 0.75rem;
+  max-height: 12rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.thread-root-label {
+  color: var(--color-muted);
+  font-size: var(--text-time);
+  margin-bottom: 0.375rem;
+}
+.thread-root-preview p {
+  font-size: var(--text-meta);
+  line-height: 1.5;
+  margin-top: 0.5rem;
+}
+.thread-root-preview .stream-event-heading {
+  font-size: var(--text-meta);
+}
+.incident-room .thread-root > .incident-button {
+  font-size: var(--text-meta);
+  padding: 0.25rem 0.5rem;
+  border-color: transparent;
+  color: var(--color-accent);
+  margin-top: 0.25rem;
+}
+.incident-room .thread-surface .timeline-viewport {
+  height: min(43dvh, 34rem);
+}
+.thread-message,
+.thread-surface .stream-local {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.thread-message-reply {
+  padding-left: 1.5rem;
+}
+.incident-room .reply-reference {
+  border: 1px solid var(--color-line);
+  border-left: 2px solid var(--color-accent);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-small);
+  font-size: var(--text-meta);
+  color: var(--color-secondary);
+  margin-bottom: 0.625rem;
+}
+.incident-room .thread-reply-context {
+  padding: 0.5rem 1rem;
+  font-size: var(--text-meta);
+  border: 0;
+}
+.thread-reply-context .incident-button {
+  font-size: var(--text-meta);
+}
+@media (min-width: 64rem) {
+  .incident-room .incident-room-layout {
+    grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr);
+    gap: 1rem 1.5rem;
+    align-items: start;
+  }
+  .incident-room .incident-room-layout:has(.thread-room-open) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .incident-room .incident-room-layout:has(.thread-room-open) .room-context-content {
+    max-width: 54rem;
+  }
+  .incident-room .thread-room-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+}
+@media (max-width: 63.99rem) {
+  body:has(.incident-room .thread-surface) {
+    overflow: hidden;
+  }
+  .incident-command-strip h1 {
+    font-size: 1.5rem;
+    line-height: 1.875rem;
+  }
+  .incident-room .thread-surface {
+    inset: 0;
+    z-index: 40;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    height: 100dvh;
+    overflow-y: auto;
+  }
+  .incident-room .thread-surface .timeline-viewport {
+    flex: 1 0 8rem;
+    height: auto;
+    min-height: 8rem;
+  }
+  .incident-room .thread-surface .timeline-compose {
+    flex-shrink: 0;
+  }
+  .incident-room .thread-root {
+    max-height: 9rem;
+  }
+  .incident-room .thread-surface .compose-editor {
+    max-height: 8rem;
+  }
+}
+@media (max-width: 30rem) {
+  .room-command-metadata {
+    gap: 0.5rem;
+  }
+  .chronology-event {
+    grid-template-columns: 1.875rem minmax(0, 1fr);
+    padding: 0 0.5rem 0 0.25rem;
+  }
+  .chronology-marker svg {
+    padding: 0.125rem;
+  }
+  .chronology-content {
+    padding-left: 0.375rem;
+  }
+  .stream-time {
+    margin-left: 0;
+  }
+  .stream-message-heading .stream-time {
+    flex-basis: 100%;
+  }
+  .stream-transition .ui-badge {
+    font-size: var(--text-time);
+  }
+  .compose-actions {
+    gap: 0.25rem;
+  }
+  .compose-draft {
+    flex-basis: 100%;
+    order: 1;
+  }
+}
+@media (forced-colors: active) {
+  .chronology-marker {
+    background: none;
+    border-left: 1px solid CanvasText;
+  }
+  .chronology-marker svg,
+  .stream-signal,
+  .room-services > span,
+  .mention-picker {
+    border-color: CanvasText;
+  }
+  .room-connection-offline,
+  .room-connection-reconnecting,
+  .stream-local-unknown,
+  .stream-local-failed {
+    outline: 1px solid CanvasText;
+  }
+  .incident-room .timeline-target {
+    outline: 2px solid Highlight;
+  }
+}

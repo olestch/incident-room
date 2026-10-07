@@ -46,7 +46,7 @@ export interface ActiveThreadPort {
 export function useRoomRealtime(
   incident: Incident,
   actor: CurrentUser,
-  delivery: DeliveryCoordinator,
+  delivery: Pick<DeliveryCoordinator, 'acknowledge'>,
   threadPort?: RefObject<ActiveThreadPort | null>,
 ) {
   const { coordinator: session, adapter } = useSessionRuntime();

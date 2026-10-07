@@ -435,7 +435,9 @@ These details supplement the concise README controls; they describe existing beh
 
 The authenticated shell keeps one feature-content tree across expanded, compact and drawer navigation. Drawer visibility and the user popover are local presentation state; they do not recreate identity providers, Query, Redux, realtime or Demo runtimes. Native modal dialogs retain their content while closed, so Demo operation feedback survives dismissal. Shell layout adds no scrolling/overflow ancestor around the Timeline viewport. One authoritative unread Query subscription supplies both navigation affordances.
 
-Basic presentation primitives live in `shared/ui`; domain badge variants live in `features/incident-management`. Tailwind 4 maps raw palette values to semantic surface, interaction, typography and domain tokens. Lucide React supplies named, tree-shakeable icons; native dialog/popover behavior supplies shell overlays without a second headless-component dependency.
+Basic presentation primitives live in `shared/ui`; incident domain badge variants live in `entities/incident`, with the existing incident-management exports retained. Timeline audit transitions and incident discovery reuse these variants without sibling-feature imports. Tailwind 4 maps raw palette values to semantic surface, interaction, typography and domain tokens. Lucide React supplies named, tree-shakeable icons; native dialog/popover behavior supplies shell overlays without a second headless-component dependency.
+
+The shared message-delivery hook owns coordinator instances in its effect and exposes a stable forwarding port. Development Strict Mode cleanup disposes the first instance immediately; replay creates a fresh instance for Timeline and Thread restoration. Actual unmount still aborts the owned instance, and the delivery algorithm, identity leases and reconciliation rules remain unchanged.
 
 ## Public implementation references
 

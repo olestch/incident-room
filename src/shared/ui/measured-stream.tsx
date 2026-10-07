@@ -173,7 +173,7 @@ export const MeasuredStream = forwardRef<
     <>
       {updates.length > 0 && (
         <button
-          className="incident-button my-2"
+          className="incident-button stream-new-updates"
           onClick={() => {
             goLatest?.();
             virtual.scrollToEnd({ behavior: 'auto' });
@@ -236,7 +236,7 @@ export const MeasuredStream = forwardRef<
                 }}
               >
                 {(targetActive ? (targetId ?? highlight) : highlight) === row.entry?.id &&
-                  row.entry && <p className="font-semibold">Navigation target</p>}
+                  row.entry && <p className="stream-target-label">Navigation target</p>}
                 {renderRow(item.index)}
               </li>
             );

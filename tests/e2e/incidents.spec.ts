@@ -160,9 +160,13 @@ test('create validates, preserves state on resize, navigates to real detail and 
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: /INC-2873/ })).toBeFocused();
   await expect(page.getByLabel('Incident detail')).toContainText('Commander: Sage Linden');
-  await expect(page.getByLabel('Incident detail')).toContainText(
-    'Participants (2): Sage Linden, River Vale',
-  );
+  await expect(page.getByLabel('Incident detail')).toContainText('2 participants');
+  const context = page.getByRole('complementary', { name: 'Incident context', exact: true });
+  await expect(context).toContainText('Participants · 2');
+  if (!(await context.getByRole('list').isVisible()))
+    await context.getByText('Incident context', { exact: true }).click();
+  await expect(context.getByRole('list')).toContainText('Sage Linden');
+  await expect(context.getByRole('list')).toContainText('River Vale');
   await expect(page.getByLabel('Incident detail')).toContainText('Triggered');
   await expect(page.getByLabel('Incident detail')).toContainText('Aurora Edge');
   await expect(page.getByRole('heading', { name: 'Timeline', exact: true })).toBeVisible();

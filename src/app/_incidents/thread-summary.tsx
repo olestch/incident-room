@@ -5,6 +5,8 @@ import { threadKeys, threadSchema, mergeThread, type Thread } from '@/entities/t
 import type { CurrentUser, WorkspaceUser } from '@/entities/current-user/model';
 import type { Incident } from '@/entities/incident/model';
 import { useSessionRuntime } from '@/app/_providers/session-provider';
+import { MessageSquare } from 'lucide-react';
+import { Button } from '@/shared/ui/primitives';
 export function ThreadSummary({
   root,
   incident,
@@ -54,26 +56,28 @@ export function ThreadSummary({
   const summary = query.data;
   return (
     <div className="thread-summary">
-      <button
-        className="incident-button"
+      <Button
+        variant="quiet"
+        className="stream-discuss"
         onClick={(event) => open(root, event.currentTarget)}
         aria-label={`Open Thread for ${root}`}
+        aria-description={
+          summary
+            ? `${summary.confirmedMessageCount} confirmed replies, ${summary.participantCount} participants. Last activity ${new Date(summary.lastActivityAt).toUTCString()}.`
+            : 'Discuss this Timeline entry.'
+        }
+        title={
+          summary
+            ? `${summary.participantCount} participants · ${summary.participantIds
+                .slice(0, 3)
+                .map((id) => users.find((u) => u.id === id)?.name ?? 'Workspace member')
+                .join(', ')} · Last activity ${new Date(summary.lastActivityAt).toUTCString()}`
+            : 'Discuss this entry'
+        }
       >
-        {summary ? `${summary.confirmedMessageCount} replies` : 'Discuss in Thread'}
-      </button>
-      {summary && (
-        <p className="text-xs text-muted">
-          {summary.participantCount} participants ·{' '}
-          {summary.participantIds
-            .slice(0, 3)
-            .map((id) => users.find((u) => u.id === id)?.name ?? 'Workspace member')
-            .join(', ')}{' '}
-          · Last activity{' '}
-          <time dateTime={summary.lastActivityAt}>
-            {new Date(summary.lastActivityAt).toLocaleString()}
-          </time>
-        </p>
-      )}
+        <MessageSquare size={14} aria-hidden="true" />
+        {summary ? `${summary.confirmedMessageCount} replies` : 'Discuss'}
+      </Button>
       {query.isError && (
         <button className="incident-button" onClick={() => void query.refetch()}>
           Retry Thread summary

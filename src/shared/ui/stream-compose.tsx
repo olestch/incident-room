@@ -1,5 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
+import { AtSign, Send, X } from 'lucide-react';
+import { Button, InlineAlert } from './primitives';
 import { messageBodySchema } from '@/shared/messaging/model';
 export function StreamCompose({
   body,
@@ -27,6 +29,9 @@ export function StreamCompose({
   label?: string;
 }) {
   const [validation, setValidation] = useState<string | null>(null);
+  const mentionId = useId();
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLDivElement>(null);
   const submit = () => {
     const result = messageBodySchema.safeParse(body);
     if (!result.success) {
@@ -53,12 +58,13 @@ export function StreamCompose({
         submit();
       }}
     >
-      <label htmlFor={`${label}-body`} className="font-semibold">
+      <label htmlFor={`${label}-body`} className="compose-label">
         Message
       </label>
       <textarea
+        ref={editor}
         id={`${label}-body`}
-        className="incident-input mt-2"
+        className="incident-input compose-editor"
         rows={3}
         maxLength={4000}
         value={body}
@@ -80,30 +86,54 @@ export function StreamCompose({
           }
         }}
       />
-      <p id={`${label}-compose-help`} className="text-sm text-muted">
+      <p id={`${label}-compose-help`} className="compose-help">
         Plain text · {body.length}/4,000 · Enter: newline · Ctrl/Cmd+Enter: Send
       </p>
-      <p id={`${label}-compose-error`} role={validation || issue ? 'alert' : undefined}>
-        {validation ?? issue}
-      </p>
-      <div className="flex flex-wrap items-center gap-2 mt-2">
-        <button
-          className="incident-button incident-primary"
-          type="submit"
-          disabled={!ready || busy}
-        >
-          Send
-        </button>
-        <button
-          className="incident-button"
-          type="button"
-          disabled={!ready || busy || !body}
-          onClick={discard}
-        >
+      <div id={`${label}-compose-error`}>
+        {(validation || issue) && <InlineAlert>{validation ?? issue}</InlineAlert>}
+      </div>
+      <div className="compose-actions">
+        <Button variant="quiet" popoverTarget={mentionId} disabled={!ready || busy}>
+          <AtSign size={16} aria-hidden="true" />
+          Mention
+        </Button>
+        <Button variant="quiet" disabled={!ready || busy || !body} onClick={discard}>
           Discard draft
-        </button>
-        <label className="text-sm">
-          Mention{' '}
+        </Button>
+        <span className="compose-draft">
+          {!ready ? 'Restoring local draft…' : busy ? 'Saving locally…' : body ? 'Local draft' : ''}
+        </span>
+        <Button variant="primary" type="submit" disabled={!ready || busy}>
+          <Send size={16} aria-hidden="true" />
+          Send
+        </Button>
+      </div>
+      <div
+        id={mentionId}
+        ref={picker}
+        popover="auto"
+        className="mention-picker"
+        aria-label="Mention picker"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') event.stopPropagation();
+        }}
+        onToggle={(event) => {
+          if (event.newState === 'open') event.currentTarget.querySelector('select')?.focus();
+        }}
+      >
+        <div className="mention-picker-heading">
+          <strong>Mention a workspace user</strong>
+          <Button
+            variant="quiet"
+            aria-label="Close mentions"
+            popoverTarget={mentionId}
+            popoverTargetAction="hide"
+          >
+            <X size={16} aria-hidden="true" />
+          </Button>
+        </div>
+        <label>
+          Workspace user
           <select
             className="incident-input"
             aria-label="Mention workspace user"
@@ -118,6 +148,8 @@ export function StreamCompose({
                     4000,
                   ),
                 );
+              picker.current?.hidePopover();
+              editor.current?.focus({ preventScroll: true });
             }}
           >
             <option value="">Choose a person</option>

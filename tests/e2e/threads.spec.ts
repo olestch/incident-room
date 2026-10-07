@@ -84,6 +84,55 @@ async function controls(
     { input, expired },
   );
 }
+test('compact Discuss, responsive context and native mention pickers preserve both drafts and Thread focus', async ({
+  page,
+}) => {
+  await login(page);
+  const timeline = page.getByRole('form', { name: 'Timeline compose' });
+  await timeline.getByLabel('Message', { exact: true }).fill('Timeline draft');
+  await timeline.getByRole('button', { name: 'Mention', exact: true }).click();
+  await expect(timeline.getByLabel('Mention workspace user')).toBeFocused();
+  await timeline.getByLabel('Mention workspace user').selectOption('demo-sage');
+  await expect(timeline.getByLabel('Message', { exact: true })).toHaveValue(
+    'Timeline draft @Sage Linden [demo-sage] ',
+  );
+  await expect(timeline.getByLabel('Message', { exact: true })).toBeFocused();
+  await expect(timeline.getByLabel('Mention picker')).toBeHidden();
+  await page.setViewportSize({ width: 320, height: 800 });
+  const context = page.getByRole('complementary', { name: 'Incident context', exact: true });
+  await context.getByText('Incident context', { exact: true }).click();
+  await expect(context).toContainText('Commander');
+  await context.getByText('Incident context', { exact: true }).click();
+  await expect(timeline.getByLabel('Message', { exact: true })).toHaveValue(
+    'Timeline draft @Sage Linden [demo-sage] ',
+  );
+  await expect(rootButton(page, empty)).toHaveText('Discuss');
+  await open(page, empty);
+  const thread = surface(page);
+  await thread.getByRole('button', { name: 'Mention', exact: true }).click();
+  await thread.getByLabel('Mention workspace user').press('Escape');
+  await expect(thread).toBeVisible();
+  await expect(thread.getByLabel('Mention picker')).toBeHidden();
+  await expect(thread.getByRole('button', { name: 'Mention', exact: true })).toBeFocused();
+  await thread.getByRole('button', { name: 'Mention', exact: true }).click();
+  await thread.getByLabel('Mention workspace user').selectOption('demo-sage');
+  await expect(thread.getByLabel('Message', { exact: true })).toBeFocused();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(thread.getByLabel('Message', { exact: true })).toHaveValue(
+    '@Sage Linden [demo-sage] ',
+  );
+  await thread.getByLabel('Message', { exact: true }).press('Control+Enter');
+  await expect(replyRow(page, '@Sage Linden [demo-sage]')).toHaveCount(1);
+  await thread.getByRole('button', { name: 'Back to Timeline / Close Thread' }).click();
+  await expect(rootButton(page, empty)).toBeFocused();
+  await expect(rootButton(page, empty)).toHaveText('1 replies');
+  await expect(timeline.getByLabel('Message', { exact: true })).toHaveValue(
+    'Timeline draft @Sage Linden [demo-sage] ',
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
 test('populated Thread open and close keeps Timeline reading context and restores focus', async ({
   page,
 }) => {
@@ -165,7 +214,9 @@ test('direct unloaded root resolves without repositioning Timeline or loading al
     if (request.url().includes('/timeline')) roots.push(request.url());
   });
   await direct(page, large);
-  await expect(surface(page).getByText(`Root: ${large}`, { exact: true })).toBeVisible();
+  await expect(
+    surface(page).getByText(`Discussion of Timeline entry · ${large}`, { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByLabel('Timeline viewport', { exact: true }).locator('[data-entry-id]').last(),
   ).toHaveAttribute('data-entry-id', populated);

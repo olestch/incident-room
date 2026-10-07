@@ -31,16 +31,13 @@ import {
   serializeIncidentFilters,
   type IncidentFilters,
 } from '@/entities/incident/filters';
-import {
-  CreateIncidentDialog,
-  IncidentContext,
-  IncidentFiltersView,
-} from '@/features/incident-management/views';
+import { CreateIncidentDialog, IncidentFiltersView } from '@/features/incident-management/views';
 import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { AppError } from '@/shared/errors/app-error';
 import { TimelineRoom } from './timeline-room';
 import { useCommands } from '@/app/_discovery/commands-context';
 import { PostmortemEntry } from '@/app/_postmortem/entry';
+import { IncidentCommandStrip, IncidentDetails } from '@/features/incident-management/room-context';
 
 export function IncidentPage({ number }: { number?: string }) {
   const { state } = useSessionRuntime();
@@ -223,12 +220,12 @@ function IdentityIncidentPage({
     ['authentication', 'authorization', 'not-found'].includes(error.category);
   if (number)
     return (
-      <section aria-label="Incident detail">
+      <section aria-label="Incident detail" className="incident-room">
         <Link className="underline" href="/app/incidents">
           Back to incidents
         </Link>
         <div className="incident-room-layout">
-          <div className="my-6 min-w-0">
+          <div className="room-loading">
             {(detail.isPending || (detail.data && users.isPending)) && (
               <p role="status">Loading incident…</p>
             )}
@@ -239,11 +236,22 @@ function IdentityIncidentPage({
               !inaccessible(detail.error) &&
               !inaccessible(users.error) && (
                 <>
-                  <IncidentContext incident={detail.data} users={users.data} detail />
-                  {current.data && <PostmortemEntry incident={detail.data} actor={current.data} />}
+                  <IncidentCommandStrip incident={detail.data} users={users.data} />
                 </>
               )}
           </div>
+          {detail.data &&
+            users.data &&
+            !inaccessible(detail.error) &&
+            !inaccessible(users.error) && (
+              <IncidentDetails
+                incident={detail.data}
+                users={users.data}
+                threadOpen={params.get('thread') !== null}
+              >
+                {current.data && <PostmortemEntry incident={detail.data} actor={current.data} />}
+              </IncidentDetails>
+            )}
           {detail.data &&
             users.data &&
             current.data &&

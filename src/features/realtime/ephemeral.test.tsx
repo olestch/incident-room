@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { z } from 'zod';
 import { memberSchema, type PresenceMember } from './protocol';
-import { RealtimeSummary } from './views';
+import { RealtimeSummary, TimelineTyping } from './views';
 
 function broker() {
   let now = 0;
@@ -91,13 +91,16 @@ it('presence summary discovers names, typing excludes own identity and larger gr
     avatar: null,
   }));
   render(
-    <RealtimeSummary
-      status="connected"
-      members={members}
-      users={users}
-      userId="river"
-      retry={() => {}}
-    />,
+    <>
+      <RealtimeSummary
+        status="connected"
+        members={members}
+        users={users}
+        userId="river"
+        retry={() => {}}
+      />
+      <TimelineTyping members={members} users={users} userId="river" />
+    </>,
   );
   expect(screen.getByLabelText('Realtime connection')).toHaveTextContent('Connected');
   expect(screen.getByLabelText('Incident presence')).toHaveTextContent('4 people viewing');
