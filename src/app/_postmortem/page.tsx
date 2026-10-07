@@ -32,7 +32,10 @@ import {
   ActionEditor,
   ActionItemView,
 } from '@/features/postmortem/views';
-import { EntryContent } from '@/features/timeline/views';
+import { FileText, ListChecks, ArrowLeft, Link2 } from 'lucide-react';
+import { Button, Badge, InlineAlert } from '@/shared/ui/primitives';
+import { EmptyState, RowSkeletons } from '@/shared/ui/secondary-feedback';
+import { TimelineEvidence } from '@/features/postmortem/evidence';
 import { IncidentTime } from '@/features/incident-management/views';
 import { AppError } from '@/shared/errors/app-error';
 
@@ -260,18 +263,20 @@ function IdentityPostmortem({
   const unavailable = inaccessible(failure);
   if (!record || !users.data || !current.data || unavailable)
     return (
-      <section>
-        <h1 className="text-3xl font-semibold">Postmortem</h1>
+      <section className="secondary-page postmortem-page">
+        <header className="secondary-page-header">
+          <p className="secondary-eyebrow">Incident review</p>
+          <h1>Postmortem</h1>
+        </header>
         {failure ? (
-          <div role="alert">
+          <InlineAlert>
             <p>
               {unavailable
                 ? 'Postmortem not found or access denied.'
                 : 'Unable to load Postmortem.'}
             </p>
             {!unavailable && (
-              <button
-                className="incident-button"
+              <Button
                 onClick={() => {
                   void incident.refetch();
                   void users.refetch();
@@ -279,18 +284,20 @@ function IdentityPostmortem({
                 }}
               >
                 Retry Postmortem
-              </button>
+              </Button>
             )}
-          </div>
+          </InlineAlert>
         ) : (
-          <p role="status">Loading Postmortem…</p>
+          <RowSkeletons label="Loading Postmortem…" rows={4} />
         )}
       </section>
     );
   if (record.status !== 'resolved')
     return (
-      <section>
-        <h1>Postmortem</h1>
+      <section className="secondary-page postmortem-page">
+        <header className="secondary-page-header">
+          <h1>Postmortem</h1>
+        </header>
         <p role="alert">Postmortem is available only for Resolved incidents.</p>
         <Link href={`/app/incidents/${number}`} className="underline">
           Back to Incident Room
@@ -302,31 +309,35 @@ function IdentityPostmortem({
   const name = (id: string) =>
     users.data?.find((user) => user.id === id)?.name ?? 'Unavailable user';
   return (
-    <section className="mx-auto max-w-3xl min-w-0 space-y-5 break-words">
-      <Link href={`/app/incidents/${number}`} className="underline">
-        Back to Incident Room
+    <section className="secondary-page postmortem-page">
+      <Link href={`/app/incidents/${number}`} className="secondary-text-link">
+        <ArrowLeft size={16} aria-hidden="true" /> Back to Incident Room
       </Link>
-      <h1 className="text-3xl font-semibold">{number} · Postmortem</h1>
-      {detail.isPending && <p role="status">Loading Postmortem…</p>}
+      <header className="secondary-page-header postmortem-header">
+        <p className="secondary-eyebrow">Incident review · {number}</p>
+        <h1>{number} · Postmortem</h1>
+        <p>{record.title}</p>
+      </header>
+      {detail.isPending && <RowSkeletons label="Loading Postmortem…" rows={4} />}
       {detail.isError && (
-        <div role="alert">
+        <InlineAlert>
           <p>Unable to refresh Postmortem. Existing fields remain available.</p>
-          <button className="incident-button" onClick={() => void detail.refetch()}>
-            Retry Postmortem
-          </button>
-        </div>
+          <Button onClick={() => void detail.refetch()}>Retry Postmortem</Button>
+        </InlineAlert>
       )}
       {detail.data && !document && (
-        <div>
-          <p>Postmortem has not been initiated.</p>
+        <div className="secondary-surface">
+          <EmptyState icon={FileText} title="Start the shared review">
+            <p>Postmortem has not been initiated.</p>
+          </EmptyState>
           {canInitiatePostmortem(current.data, record) ? (
-            <button
+            <Button
               disabled={mutation.isPending}
-              className="incident-button incident-primary mt-3"
+              variant="primary"
               onClick={() => mutation.mutate({ type: 'initiate' })}
             >
               {mutation.isPending ? 'Initiating…' : 'Initiate Postmortem'}
-            </button>
+            </Button>
           ) : (
             <p>Read-only. A commander or admin must initiate this shared draft.</p>
           )}
@@ -335,10 +346,13 @@ function IdentityPostmortem({
       )}
       {document && (
         <>
-          <p>
-            Shared draft · Revision {document.revision} · Updated by {name(document.updatedBy)} ·{' '}
-            <IncidentTime value={document.updatedAt} />
-          </p>
+          <div className="postmortem-metadata">
+            <p>
+              Shared draft · Revision {document.revision} · Updated by {name(document.updatedBy)} ·{' '}
+              <IncidentTime value={document.updatedAt} />
+            </p>
+            <Badge>{editable ? 'Editable' : 'Read-only'}</Badge>
+          </div>
           {editable ? (
             <PostmortemEditor
               record={document}
@@ -360,10 +374,12 @@ function IdentityPostmortem({
             />
           ) : (
             <>
-              <p>Read-only · Workspace member viewing this Postmortem.</p>
+              <p className="postmortem-read-only">
+                Read-only · Workspace member viewing this Postmortem.
+              </p>
               <StructuredSections fields={document} />
-              <section>
-                <h2 className="text-xl font-semibold">Timeline</h2>
+              <section className="postmortem-section postmortem-evidence">
+                <h2 className="postmortem-section-title">Timeline</h2>
                 <TimelineSelection
                   ids={document.timelineEntryIds}
                   record={record}
@@ -373,13 +389,17 @@ function IdentityPostmortem({
               </section>
             </>
           )}
-          <section className="space-y-4">
-            <h2 className="text-xl font-semibold">Action Items</h2>
+          <section className="postmortem-actions">
+            <h2 className="postmortem-section-title">Action Items</h2>
             <p className="text-sm text-muted">
-              Date-only calendar dates, no timezone conversion. Open → In progress → Done; any
-              explicit status change is supported. No deletion.
+              Follow-up work from this review. Assign an owner, set a calendar due date and track
+              progress.
             </p>
-            {!detail.data?.items.length && <p>No Action Items yet.</p>}
+            {!detail.data?.items.length && (
+              <EmptyState icon={ListChecks} title="No Action Items yet">
+                <p>Add a concrete follow-up when the review identifies one.</p>
+              </EmptyState>
+            )}
             {detail.data?.items.map((item) =>
               editable ? (
                 <ExistingAction
@@ -416,12 +436,7 @@ function IdentityPostmortem({
                   }}
                 />
               ) : (
-                <button
-                  className="incident-button"
-                  onClick={() => setCreationId(crypto.randomUUID())}
-                >
-                  Add Action Item
-                </button>
+                <Button onClick={() => setCreationId(crypto.randomUUID())}>Add Action Item</Button>
               ))}
           </section>
         </>
@@ -441,7 +456,15 @@ function ExistingAction({
   save: (fields: ActionFields, revision: number) => Promise<ActionItem>;
 }) {
   const changed = useCallback((value: boolean) => setDirty(item.id, value), [item.id, setDirty]);
-  return <ActionEditor item={item} users={users} save={save} changed={changed} />;
+  return (
+    <ActionEditor
+      initiallyExpanded={false}
+      item={item}
+      users={users}
+      save={save}
+      changed={changed}
+    />
+  );
 }
 function TimelineSelection({
   ids,
@@ -500,40 +523,42 @@ function TimelineSelection({
       ),
   });
   return (
-    <div className="space-y-3">
+    <div className="evidence-selection">
       <p>
-        References to source events, ordered by authoritative occurrence time. Up to 100 selections;
-        removing a reference does not delete its source.
+        Link source events as evidence for this review. Up to 100 references; removing one keeps the
+        source event.
       </p>
-      {selected.isPending && <p role="status">Loading selected Timeline references…</p>}
+      {selected.isPending && (
+        <RowSkeletons label="Loading selected Timeline references…" rows={2} />
+      )}
       {selected.error && (
         <p role="alert">
           Unable to load selected references.{' '}
-          <button type="button" className="underline" onClick={() => void selected.refetch()}>
+          <Button type="button" className="underline" onClick={() => void selected.refetch()}>
             Retry references
-          </button>
+          </Button>
         </p>
       )}
       {!ids.length && <p>No Timeline entries selected.</p>}
-      <ol aria-label="Selected Timeline entries" className="space-y-3">
+      <ol aria-label="Selected Timeline entries" className="evidence-list">
         {selected.data?.map((entry) => (
-          <li key={entry.id} className="rounded border border-line p-3">
+          <li key={entry.id} className="evidence-row">
             <IncidentTime value={entry.occurredAt} />
-            <EntryContent entry={entry} users={users} />
+            <TimelineEvidence entry={entry} users={users} />
             <Link
-              className="underline"
+              className="secondary-text-link"
               href={`/app/incidents/${record.number}?event=${encodeURIComponent(entry.id)}`}
             >
-              View source event
+              <Link2 size={15} aria-hidden="true" /> View source event
             </Link>
             {change && (
-              <button
+              <Button
                 type="button"
-                className="incident-button ml-2"
+                variant="quiet"
                 onClick={() => change(ids.filter((id) => id !== entry.id))}
               >
                 Remove reference
-              </button>
+              </Button>
             )}
           </li>
         ))}
@@ -541,44 +566,44 @@ function TimelineSelection({
           ids
             .filter((id) => !selected.data.some((entry) => entry.id === id))
             .map((id) => (
-              <li key={id}>
+              <li key={id} className="evidence-row evidence-unavailable">
                 Source event unavailable.
                 {change && (
-                  <button
+                  <Button
                     type="button"
-                    className="incident-button"
+
                     onClick={() => change(ids.filter((value) => value !== id))}
                   >
                     Remove unavailable reference
-                  </button>
+                  </Button>
                 )}
               </li>
             ))}
       </ol>
       {change && (
         <>
-          <button type="button" className="incident-button" onClick={() => setBrowse(!browse)}>
+          <Button type="button" onClick={() => setBrowse(!browse)}>
             {browse ? 'Hide Timeline selection' : 'Select Timeline entries'}
-          </button>
+          </Button>
           {browse && (
             <div>
               {candidates.isPending && <p role="status">Loading Timeline choices…</p>}
               {candidates.error && (
                 <p role="alert">
                   Timeline choices unavailable.{' '}
-                  <button
+                  <Button
                     type="button"
                     className="underline"
                     onClick={() => void candidates.refetch()}
                   >
                     Retry choices
-                  </button>
+                  </Button>
                 </p>
               )}
-              <ul aria-label="Timeline choices" className="max-h-96 space-y-3 overflow-y-auto">
+              <ul aria-label="Timeline choices" className="evidence-choices">
                 {candidates.data?.items.map((entry) => (
-                  <li key={entry.id} className="rounded border border-line p-3">
-                    <label className="block">
+                  <li key={entry.id} className="evidence-row">
+                    <label className="evidence-checkbox">
                       <input
                         type="checkbox"
                         aria-label={`Include ${entry.id}`}
@@ -595,18 +620,18 @@ function TimelineSelection({
                       Include event {entry.important ? '· Important' : ''}
                     </label>
                     <IncidentTime value={entry.occurredAt} />
-                    <EntryContent entry={entry} users={users} />
+                    <TimelineEvidence entry={entry} users={users} />
                   </li>
                 ))}
               </ul>
               {candidates.data?.olderCursor && (
-                <button
+                <Button
                   type="button"
-                  className="incident-button mt-2"
+                  className="secondary-more"
                   onClick={() => setCursor(candidates.data!.olderCursor)}
                 >
                   Older Timeline choices
-                </button>
+                </Button>
               )}
             </div>
           )}

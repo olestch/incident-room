@@ -45,7 +45,12 @@ async function createAction(page: Page) {
   await expect(
     page.getByRole('form', { name: 'Edit Action Item Verify recovery guard', exact: true }),
   ).toBeVisible();
-  return page.getByRole('form', { name: 'Edit Action Item Verify recovery guard', exact: true });
+  const editor = page.getByRole('form', {
+    name: 'Edit Action Item Verify recovery guard',
+    exact: true,
+  });
+  await editor.getByRole('button', { name: 'Edit Action Item', exact: true }).click();
+  return editor;
 }
 test('resolved commander initiates shared draft, saves all structured sections and persists reload', async ({
   page,
@@ -93,7 +98,7 @@ test('nonparticipant workspace member reads existing Postmortem and Action Items
   await expect(reader.getByRole('textbox')).toHaveCount(0);
   await expect(reader.getByRole('button', { name: /Save|Add Action|Initiate/ })).toHaveCount(0);
   await expect(
-    reader.getByText(/Status: open · Assignee: Sage Linden · Due: 2026-11-03/),
+    reader.getByRole('article').filter({ hasText: 'Verify recovery guard' }),
   ).toBeVisible();
 });
 test('participant saves and clean second editor adopts confirmed realtime revision', async ({
@@ -146,6 +151,7 @@ test('Action Item date-only assignment/status persist and card controls fit mobi
     name: 'Edit Action Item Verify recovery guard',
     exact: true,
   });
+  await restored.getByRole('button', { name: 'Edit Action Item', exact: true }).click();
   await expect(restored.getByLabel('Due date', { exact: true })).toHaveValue('2026-11-03');
   await expect(restored.getByLabel('Assignee', { exact: true })).toHaveValue('demo-sage');
   await expect(restored.getByLabel('Action status', { exact: true })).toHaveValue('in_progress');
@@ -167,6 +173,7 @@ test('Action Item realtime updates converge once and stale item update cannot ov
     exact: true,
   });
   await expect(other).toBeVisible();
+  await other.getByRole('button', { name: 'Edit Action Item', exact: true }).click();
   await other.getByLabel('Action description', { exact: true }).fill('My unsaved item work.');
   await item.getByLabel('Action status', { exact: true }).selectOption('done');
   await item.getByRole('button', { name: 'Save Action Item', exact: true }).click();
@@ -195,6 +202,7 @@ test('clean Action Item viewer receives confirmed status without refresh or dupl
     exact: true,
   });
   await expect(other).toBeVisible();
+  await other.getByRole('button', { name: 'Edit Action Item', exact: true }).click();
   await item.getByLabel('Action status', { exact: true }).selectOption('done');
   await item.getByRole('button', { name: 'Save Action Item', exact: true }).click();
   await expect(other.getByLabel('Action status', { exact: true })).toHaveValue('done');
@@ -320,4 +328,72 @@ test('dirty local navigation and palette respect confirmation; no horizontal ove
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('link', { name: 'Back to Incident Room', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${number}$`));
+});
+
+test('closing an Action Item editor preserves unsaved values through responsive changes', async ({
+  page,
+}) => {
+  await initiate(page);
+  const item = await createAction(page);
+  await item.getByLabel('Action description', { exact: true }).fill('Unsaved follow-up evidence.');
+  await item.getByRole('button', { name: 'Close editor', exact: true }).click();
+  await expect(item.getByText(/Unsaved changes/)).toBeVisible();
+  for (const width of [320, 768, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  await item.getByRole('button', { name: 'Edit Action Item', exact: true }).click();
+  await expect(item.getByLabel('Action description', { exact: true })).toHaveValue(
+    'Unsaved follow-up evidence.',
+  );
+  await item.getByRole('button', { name: 'Save Action Item', exact: true }).click();
+  await expect(item.getByText('Saved.', { exact: true })).toBeVisible();
+});
+test('secondary surfaces and palette fit supported widths and system contrast preferences', async ({
+  page,
+}) => {
+  await initiate(page);
+  await createAction(page);
+  for (const path of [
+    '/app/search?q=Aurora',
+    '/app/notifications',
+    '/app/team',
+    '/app/settings',
+    `/app/incidents/${number}/postmortem`,
+  ]) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    for (const width of [320, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+    }
+  }
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  await page.getByRole('button', { name: 'Commands', exact: true }).click();
+  const input = page.getByRole('combobox', { name: 'Find a command or Incident' });
+  await expect(input).toBeFocused();
+  for (const width of [320, 768, 1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const dialog = page.getByRole('dialog', { name: 'Command Palette' });
+    const bounds = await dialog.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  await input.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: 'Close palette', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(input).toBeFocused();
+  await page.getByRole('button', { name: 'Commands', exact: true }).focus();
+  await expect(input).toBeFocused();
+  await input.press('ArrowDown');
+  await expect(page.getByRole('option', { selected: true })).toContainText('My Incidents');
+  await input.press('Escape');
+  await expect(page.getByRole('button', { name: 'Commands', exact: true })).toBeFocused();
 });

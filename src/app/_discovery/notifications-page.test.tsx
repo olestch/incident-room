@@ -1,14 +1,15 @@
 import { beforeEach, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { z } from 'zod';
-import { notificationSchema } from '@/entities/notification/model';
+import { notificationSchema, notificationKeys } from '@/entities/notification/model';
 import { NotificationsPage } from './notifications-page';
 const fake = vi.hoisted(() => ({
   notification: null as unknown,
   read: false,
   revision: 1,
   calls: [] as unknown[],
+  paths: [] as string[],
   push: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fake.push }) }));
@@ -26,6 +27,7 @@ vi.mock('@/app/_providers/session-provider', () => ({
         _signal: AbortSignal,
         body?: unknown,
       ) => {
+        fake.paths.push(path);
         const item = notificationSchema.parse(fake.notification);
         if (path === '/notifications/read') {
           fake.calls.push(body);
@@ -59,6 +61,7 @@ beforeEach(() => {
   fake.read = false;
   fake.revision = 1;
   fake.calls = [];
+  fake.paths = [];
   fake.push.mockClear();
   fake.notification = {
     id: crypto.randomUUID(),
@@ -102,6 +105,33 @@ it('activation marks read and navigates to validated exact destination', async (
     expect(fake.push).toHaveBeenCalledWith('/app/incidents/INC-2841?event=entry'),
   );
   expect(fake.calls[0]).toEqual({ id: notificationSchema.parse(fake.notification).id, read: true });
+  unmount();
+  cache.clear();
+});
+
+it('observes authoritative unread revisions without starting a second unread request', async () => {
+  const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { unmount } = render(
+    <QueryClientProvider client={cache}>
+      <NotificationsPage />
+    </QueryClientProvider>,
+  );
+  await screen.findByRole('button', { name: /^Mark read$/ });
+  const key = notificationKeys.unread('sage', 'orbit');
+  act(() => {
+    cache.setQueryData(key, {
+      workspaceId: 'orbit',
+      recipientUserId: 'sage',
+      count: 19,
+      revision: 10,
+    });
+  });
+  await waitFor(() =>
+    expect(screen.getByLabelText('19 unread notifications')).toHaveTextContent('19'),
+  );
+  expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  expect(cache.getQueryState(key)?.fetchStatus).toBe('idle');
+  expect(fake.paths).not.toContain('/notifications/unread');
   unmount();
   cache.clear();
 });

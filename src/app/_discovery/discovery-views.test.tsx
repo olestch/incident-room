@@ -121,7 +121,7 @@ it('inbox read/unread and activation use separate accessible actions', async () 
       retry={() => {}}
     />,
   );
-  expect(screen.getByText(/Unread · timeline mention/)).toBeVisible();
+  expect(screen.getByText('Unread', { exact: true })).toBeVisible();
   await userEvent.click(screen.getByRole('link'));
   expect(activate).toHaveBeenCalledWith(notification);
   await userEvent.click(screen.getByRole('button', { name: /^Mark read$/ }));
@@ -179,7 +179,7 @@ it('read row exposes Mark unread instead of relying on color', () => {
       retry={() => {}}
     />,
   );
-  expect(screen.getByText(/Read · timeline mention/)).toBeVisible();
+  expect(screen.getByText('Read', { exact: true })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Mark unread' })).toBeEnabled();
 });
 function PaletteHarness({ execute, close }: { execute: (id: string) => void; close: () => void }) {
@@ -232,4 +232,90 @@ it('palette closes on cancel and restores invoking focus after unmount', async (
   unmount();
   await waitFor(() => expect(opener).toHaveFocus());
   opener.remove();
+});
+
+it('inbox loading keeps its heading and uses authoritative summary independent of loaded rows', () => {
+  const props = {
+    items: [],
+    busy: false,
+    activate: vi.fn(),
+    mark: vi.fn(),
+    markAll: vi.fn(),
+    more: false,
+    loadMore: vi.fn(),
+    error: false,
+    retry: vi.fn(),
+  };
+  const view = render(<NotificationInbox {...props} loading />);
+  expect(screen.getByRole('heading', { name: 'Notifications' })).toBeVisible();
+  expect(screen.getByRole('status')).toHaveTextContent('Loading Notifications…');
+  expect(screen.getByLabelText('Unread notifications unavailable')).toHaveTextContent('—');
+  expect(screen.queryByText('No notifications.')).not.toBeInTheDocument();
+  view.rerender(<NotificationInbox {...props} items={[notification]} unreadCount={37} />);
+  expect(screen.getByLabelText('37 unread notifications')).toHaveTextContent('37');
+  expect(screen.getByText('Timeline mention')).toBeVisible();
+  expect(screen.getByText('Unread', { exact: true })).toBeVisible();
+});
+it('palette groups bounded lookup and search while active descendant follows keyboard order', async () => {
+  const execute = vi.fn();
+  render(
+    <CommandPalette
+      commands={[]}
+      remote={[
+        {
+          id: 'incident:1',
+          category: 'Incidents',
+          label: 'INC-2841',
+          destination: '/app/incidents/INC-2841',
+        },
+        {
+          id: 'search-query',
+          category: 'Search',
+          label: 'Search all content for gateway',
+          destination: '/app/search?q=gateway',
+        },
+      ]}
+      input="gateway"
+      change={vi.fn()}
+      close={vi.fn()}
+      execute={execute}
+      loading={false}
+      error={false}
+    />,
+  );
+  expect(screen.getByText('Incidents', { exact: true })).toBeVisible();
+  expect(screen.getByText('Search all content', { exact: true })).toBeVisible();
+  const input = screen.getByRole('combobox');
+  await userEvent.keyboard('{ArrowDown}');
+  expect(input).toHaveAttribute(
+    'aria-activedescendant',
+    screen.getByRole('option', { selected: true }).id,
+  );
+  await userEvent.keyboard('{Enter}');
+  expect(execute).toHaveBeenCalledWith(expect.objectContaining({ id: 'search-query' }));
+});
+
+it('modified inbox activation keeps native link navigation without marking read', () => {
+  const activate = vi.fn();
+  render(
+    <NotificationInbox
+      items={[notification]}
+      busy={false}
+      activate={activate}
+      mark={vi.fn()}
+      markAll={vi.fn()}
+      more={false}
+      loadMore={vi.fn()}
+      error={false}
+      retry={vi.fn()}
+    />,
+  );
+  const link = screen.getByRole('link');
+  expect(link).toHaveAttribute('href', '/app/incidents/INC-2841?event=entry');
+  for (const modifier of ['ctrlKey', 'metaKey', 'shiftKey', 'altKey']) {
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true, [modifier]: true });
+    fireEvent(link, event);
+    expect(event.defaultPrevented).toBe(false);
+  }
+  expect(activate).not.toHaveBeenCalled();
 });

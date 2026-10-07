@@ -9,6 +9,8 @@ import {
 } from 'react-hook-form';
 import { z } from 'zod';
 import { AppError } from '@/shared/errors/app-error';
+import { Button, Badge, InlineAlert } from '@/shared/ui/primitives';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { SafeText } from '@/shared/ui/safe-text';
 import type { WorkspaceUser } from '@/entities/current-user/model';
 import {
@@ -109,6 +111,7 @@ function RevisionFeedback({
   issue,
   saved,
   saving,
+  dirty,
   review,
   setReview,
   reload,
@@ -119,6 +122,7 @@ function RevisionFeedback({
   issue: Error | null;
   saved: boolean;
   saving: boolean;
+  dirty: boolean;
   review: boolean;
   setReview: (value: boolean) => void;
   reload: () => void;
@@ -128,44 +132,52 @@ function RevisionFeedback({
   return (
     <>
       {newer && (
-        <div role="alert" className="rounded-lg border border-line p-3">
+        <InlineAlert className="revision-conflict">
+          <p className="revision-title">Newer revision available</p>
           <p>
             A newer server revision exists. Your unsaved fields are preserved; saving this older
             version will conflict.
           </p>
-          <button
+          <Button
             type="button"
-            className="incident-button mr-2 mt-2"
+            className="revision-review-button"
             onClick={() => setReview(!review)}
           >
             Review latest
-          </button>
-          <button type="button" className="incident-button mt-2" disabled={saving} onClick={reload}>
+          </Button>
+          <Button
+            type="button"
+            className="revision-review-button"
+            disabled={saving}
+            onClick={reload}
+          >
             Reload latest
-          </button>
+          </Button>
           {review && (
-            <div className="mt-3" aria-label="Latest server version">
+            <div className="revision-snapshot" aria-label="Latest server version">
               {latest}
             </div>
           )}
-        </div>
+        </InlineAlert>
       )}
       {issue && (
-        <p role="alert">
+        <InlineAlert className="revision-save-error">
           {issue instanceof AppError
             ? issue.message
             : 'Save failed. Your local edits remain in the form.'}
-        </p>
+        </InlineAlert>
       )}
-      <p role="status">
+      <p role="status" className="revision-save-status">
         {saving
           ? 'Saving…'
-          : saved
+          : saved && !dirty
             ? 'Saved.'
-            : 'Explicit Save only. Unsaved fields stay on this page until navigation.'}
+            : dirty
+              ? 'Unsaved changes · Use Save to keep your edits.'
+              : 'No unsaved changes · Explicit Save only.'}
       </p>
       {localCopy && (
-        <details className="rounded border border-line p-3">
+        <details className="revision-local-copy">
           <summary>Retained local reference (not saved)</summary>
           {localCopy}
         </details>
@@ -173,12 +185,19 @@ function RevisionFeedback({
     </>
   );
 }
-export function StructuredSections({ fields }: { fields: PostmortemFields }) {
+export function StructuredSections({
+  fields,
+  level = 2,
+}: {
+  fields: PostmortemFields;
+  level?: 2 | 3;
+}) {
+  const Heading = level === 2 ? 'h2' : 'h3';
   return (
-    <div className="space-y-3">
+    <div className="postmortem-read-sections">
       {sections.map(([key, label]) => (
-        <section key={key}>
-          <h3 className="font-semibold">{label}</h3>
+        <section key={key} className="postmortem-section">
+          <Heading className="font-semibold">{label}</Heading>
           <p className="whitespace-pre-wrap break-words">
             <SafeText text={fields[key] || 'Not yet written.'} />
           </p>
@@ -207,50 +226,58 @@ export function PostmortemEditor({
   const id = useId();
   const { register, formState, watch, setValue } = editor.form;
   return (
-    <form aria-label="Postmortem editor" onSubmit={editor.submit} className="space-y-5 min-w-0">
-      <p>Shared draft · Based on revision {editor.base}</p>
+    <form aria-label="Postmortem editor" onSubmit={editor.submit} className="postmortem-editor">
+      <div className="document-save-heading">
+        <Badge>Shared draft · Based on revision {editor.base}</Badge>
+        <span>Changes are saved only when you choose Save.</span>
+      </div>
       <RevisionFeedback
         {...editor}
         saving={formState.isSubmitting}
+        dirty={formState.isDirty}
         latest={
           <>
-            <StructuredSections fields={record} />
+            <StructuredSections fields={record} level={3} />
             <p>Timeline: {record.timelineEntryIds.join(', ') || 'No entries selected.'}</p>
           </>
         }
         localCopy={
           editor.localCopy ? (
             <>
-              <StructuredSections fields={editor.localCopy} />
+              <StructuredSections fields={editor.localCopy} level={3} />
               <p>Timeline: {editor.localCopy.timelineEntryIds.join(', ')}</p>
             </>
           ) : null
         }
       />
-      <fieldset disabled={formState.isSubmitting} className="space-y-5 min-w-0">
+      <fieldset disabled={formState.isSubmitting} className="postmortem-fields">
         {sections.map(([key, label, help]) => (
-          <section key={key}>
-            <h2 className="text-xl font-semibold">
+          <section key={key} className="postmortem-section">
+            <h2 className="postmortem-section-title">
               <label htmlFor={`${id}-${key}`}>{label}</label>
             </h2>
             <p id={`${id}-${key}-help`} className="text-sm text-muted">
-              {help} Plain text, up to 8,000 characters.
+              {help}
             </p>
             <textarea
               id={`${id}-${key}`}
               {...register(key)}
               rows={5}
-              className="mt-2 w-full min-w-0 rounded border border-line p-3"
+              className="postmortem-textarea"
               aria-describedby={`${id}-${key}-help ${id}-${key}-error`}
               aria-invalid={!!formState.errors[key]}
             />
-            <p id={`${id}-${key}-error`} role={formState.errors[key] ? 'alert' : undefined}>
+            <p
+              className="secondary-field-error"
+              id={`${id}-${key}-error`}
+              role={formState.errors[key] ? 'alert' : undefined}
+            >
               {formState.errors[key]?.message}
             </p>
           </section>
         ))}
-        <section>
-          <h2 className="text-xl font-semibold">Timeline</h2>
+        <section className="postmortem-section postmortem-evidence">
+          <h2 className="postmortem-section-title">Timeline</h2>
           {timeline(watch('timelineEntryIds'), (ids) =>
             setValue('timelineEntryIds', ids, { shouldDirty: true, shouldValidate: true }),
           )}
@@ -258,9 +285,9 @@ export function PostmortemEditor({
             <p role="alert">{formState.errors.timelineEntryIds.message}</p>
           )}
         </section>
-        <button className="incident-button incident-primary" type="submit">
+        <Button variant="primary" type="submit">
           Save Postmortem
-        </button>
+        </Button>
       </fieldset>
     </form>
   );
@@ -284,12 +311,15 @@ export function ActionEditor({
   users,
   save,
   changed,
+  initiallyExpanded = true,
 }: {
   item?: ActionItem;
+  initiallyExpanded?: boolean;
   users: WorkspaceUser[];
   save: (fields: ActionFields, revision: number) => Promise<ActionItem>;
   changed: (dirty: boolean) => void;
 }) {
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const [initial] = useState(() => ({ ...emptyActionFields(), revision: 1 }));
   const editor = useRevisionForm<ActionFields, ActionFields & { revision: number }>(
     item ?? initial,
@@ -303,24 +333,50 @@ export function ActionEditor({
     <form
       aria-label={item ? `Edit Action Item ${item.title}` : 'Create Action Item'}
       onSubmit={editor.submit}
-      className="space-y-3 rounded-lg border border-line p-4 min-w-0"
+      className="action-editor"
     >
-      <h3 className="font-semibold">
+      {item && (
+        <div className="action-summary">
+          <ActionItemView item={item} users={users} />
+          <Button
+            variant="quiet"
+            aria-expanded={expanded}
+            aria-controls={`${id}-fields`}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? (
+              <ChevronUp size={16} aria-hidden="true" />
+            ) : (
+              <ChevronDown size={16} aria-hidden="true" />
+            )}
+            {expanded ? 'Close editor' : 'Edit Action Item'}
+          </Button>
+        </div>
+      )}
+      <h3 className="action-edit-heading" hidden={!!item && !expanded}>
         {item ? `Action Item · revision ${editor.base}` : 'New Action Item'}
       </h3>
-      <RevisionFeedback
-        {...editor}
-        saving={formState.isSubmitting}
-        latest={item ? <ActionSnapshot fields={item} /> : null}
-        localCopy={editor.localCopy ? <ActionSnapshot fields={editor.localCopy} /> : null}
-      />
-      <fieldset disabled={formState.isSubmitting} className="space-y-3 min-w-0">
+      {(expanded || formState.isDirty || editor.newer || editor.issue) && (
+        <RevisionFeedback
+          {...editor}
+          saving={formState.isSubmitting}
+          dirty={formState.isDirty}
+          latest={item ? <ActionSnapshot fields={item} /> : null}
+          localCopy={editor.localCopy ? <ActionSnapshot fields={editor.localCopy} /> : null}
+        />
+      )}
+      <fieldset
+        id={`${id}-fields`}
+        hidden={!!item && !expanded}
+        disabled={formState.isSubmitting}
+        className="action-fields"
+      >
         <div>
           <label htmlFor={`${id}-title`}>Action title</label>
           <input
             id={`${id}-title`}
             {...register('title')}
-            className="block w-full rounded border border-line p-2"
+            className="secondary-control"
             aria-invalid={!!formState.errors.title}
             aria-describedby={`${id}-title-error`}
           />
@@ -334,7 +390,7 @@ export function ActionEditor({
             id={`${id}-description`}
             {...register('description')}
             rows={3}
-            className="block w-full rounded border border-line p-2"
+            className="secondary-control"
             aria-invalid={!!formState.errors.description}
             aria-describedby={`${id}-description-error`}
           />
@@ -345,13 +401,13 @@ export function ActionEditor({
             {formState.errors.description?.message}
           </p>
         </div>
-        <div className="grid min-w-0 gap-3 md:grid-cols-3">
+        <div className="action-assignment-fields">
           <div>
             <label htmlFor={`${id}-assignee`}>Assignee</label>
             <select
               id={`${id}-assignee`}
               {...register('assigneeUserId', { setValueAs: (value: string) => value || null })}
-              className="block w-full min-w-0 rounded border border-line p-2"
+              className="secondary-control"
             >
               <option value="">Unassigned</option>
               {item?.assigneeUserId &&
@@ -377,7 +433,7 @@ export function ActionEditor({
               type="date"
               id={`${id}-due`}
               {...register('dueDate', { setValueAs: (value: string) => value || null })}
-              className="block w-full min-w-0 rounded border border-line p-2"
+              className="secondary-control"
               aria-invalid={!!formState.errors.dueDate}
               aria-describedby={`${id}-due-error`}
             />
@@ -387,35 +443,37 @@ export function ActionEditor({
           </div>
           <div>
             <label htmlFor={`${id}-status`}>Action status</label>
-            <select
-              id={`${id}-status`}
-              {...register('status')}
-              className="block w-full min-w-0 rounded border border-line p-2"
-            >
+            <select id={`${id}-status`} {...register('status')} className="secondary-control">
               <option value="open">Open</option>
               <option value="in_progress">In progress</option>
               <option value="done">Done</option>
             </select>
           </div>
         </div>
-        <button type="submit" className="incident-button">
+        <Button type="submit" variant="primary">
           {item ? 'Save Action Item' : 'Create Action Item'}
-        </button>
+        </Button>
       </fieldset>
     </form>
   );
 }
 export function ActionItemView({ item, users }: { item: ActionItem; users: WorkspaceUser[] }) {
   return (
-    <article className="rounded-lg border border-line p-4">
+    <article className="action-item-row">
       <h3 className="font-semibold">{item.title}</h3>
       <p className="whitespace-pre-wrap break-words">
         <SafeText text={item.description} />
       </p>
-      <p>
-        Status: {item.status.replaceAll('_', ' ')} · Assignee:{' '}
-        {users.find((user) => user.id === item.assigneeUserId)?.name ?? 'Unassigned or unavailable'}{' '}
-        · Due: {item.dueDate ?? 'None'}
+      <p className="action-item-meta">
+        <Badge className={`action-status-${item.status}`}>
+          {item.status === 'open' ? 'Open' : item.status === 'in_progress' ? 'In progress' : 'Done'}
+        </Badge>
+        <span>
+          Assignee:{' '}
+          {users.find((user) => user.id === item.assigneeUserId)?.name ??
+            'Unassigned or unavailable'}{' '}
+        </span>
+        <span>Due: {item.dueDate ?? 'None'}</span>
       </p>
     </article>
   );

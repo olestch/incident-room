@@ -1,4 +1,14 @@
 'use client';
+import { Fragment } from 'react';
+import {
+  Search,
+  ArrowRight,
+  FileWarning,
+  Command as CommandIcon,
+  X,
+  CornerDownLeft,
+} from 'lucide-react';
+import { IconButton } from '@/shared/ui/primitives';
 import { useEffect, useRef, useState, useId } from 'react';
 import { filterCommands, type Command } from './model';
 import { createDiagnostics } from '@/shared/diagnostics/diagnostics';
@@ -54,69 +64,131 @@ export function CommandPalette({
       }}
       className="command-dialog"
     >
-      <h2 id={`${id}-title`} className="text-xl font-semibold">
-        Command Palette
-      </h2>
-      <label htmlFor={`${id}-input`}>Find a command or Incident</label>
-      <input
-        ref={field}
-        id={`${id}-input`}
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded="true"
-        aria-controls={`${id}-list`}
-        aria-activedescendant={options[index] ? `${id}-option-${index}` : undefined}
-        value={input}
-        onChange={(event) => change(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            if (options.length)
-              setSelection({
-                query: input,
-                index:
-                  (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length,
-              });
-          }
-          if (event.key === 'Enter' && options[index]) {
-            event.preventDefault();
-            execute(options[index]);
-          }
-        }}
-        maxLength={200}
-        className="my-3 w-full rounded border border-line p-3"
-      />
-      <p role="status">
+      <div className="command-heading">
+        <h2 id={`${id}-title`} className="command-title">
+          Command Palette
+        </h2>
+        <IconButton label="Close palette" onClick={close}>
+          <X size={18} aria-hidden="true" />
+        </IconButton>
+      </div>
+      <div className="command-query">
+        <Search size={20} aria-hidden="true" />
+        <label className="sr-only" htmlFor={`${id}-input`}>
+          Find a command or Incident
+        </label>
+        <input
+          ref={field}
+          id={`${id}-input`}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="true"
+          aria-controls={`${id}-list`}
+          aria-activedescendant={options[index] ? `${id}-option-${index}` : undefined}
+          value={input}
+          onChange={(event) => change(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              if (options.length)
+                setSelection({
+                  query: input,
+                  index:
+                    (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) %
+                    options.length,
+                });
+            }
+            if (event.key === 'Enter' && options[index]) {
+              event.preventDefault();
+              execute(options[index]);
+            }
+          }}
+          maxLength={200}
+          className="command-input"
+          placeholder="Find a command or Incident"
+        />
+      </div>
+      <p role="status" className="command-status">
         {options.length} commands available{loading ? ' · Looking up Incidents…' : ''}
       </p>
-      {error && <p role="alert">Incident lookup unavailable. Navigation commands still work.</p>}
+      {error && (
+        <p role="alert" className="command-error">
+          Incident lookup unavailable. Navigation commands still work.
+        </p>
+      )}
       <ul id={`${id}-list`} role="listbox" aria-label="Commands" className="command-options">
-        {options.map((command, optionIndex) => (
-          <li
-            key={command.id}
-            role="option"
-            aria-selected={optionIndex === index}
-            id={`${id}-option-${optionIndex}`}
-            className={optionIndex === index ? 'command-selected' : ''}
-          >
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={() => execute(command)}
-              className="w-full p-3 text-left"
-            >
-              <span className="block text-xs text-muted">{command.category}</span>
-              {command.label}
-              {optionIndex === index && <span className="sr-only"> · Selected</span>}
-            </button>
-          </li>
-        ))}
+        {options.map((command, optionIndex) => {
+          const group =
+            command.category === 'Incidents'
+              ? 'Incidents'
+              : command.id === 'search-query'
+                ? 'Search all content'
+                : 'Commands';
+          const previous = options[optionIndex - 1];
+          const previousGroup =
+            previous?.category === 'Incidents'
+              ? 'Incidents'
+              : previous?.id === 'search-query'
+                ? 'Search all content'
+                : previous
+                  ? 'Commands'
+                  : null;
+          const Icon =
+            command.category === 'Incidents'
+              ? FileWarning
+              : command.id === 'search-query'
+                ? Search
+                : CommandIcon;
+          return (
+            <Fragment key={command.id}>
+              {group !== previousGroup && (
+                <li role="presentation" className="command-group">
+                  {group}
+                </li>
+              )}
+
+              <li
+                key={command.id}
+                role="option"
+                aria-selected={optionIndex === index}
+                id={`${id}-option-${optionIndex}`}
+                className={optionIndex === index ? 'command-selected' : ''}
+              >
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => execute(command)}
+                  className="command-option-button"
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  <span>
+                    <span className="sr-only">{command.category} · </span>
+                    {command.label}
+                  </span>
+                  <ArrowRight size={16} aria-hidden="true" />
+                  {optionIndex === index && <span className="sr-only"> · Selected</span>}
+                </button>
+              </li>
+            </Fragment>
+          );
+        })}
       </ul>
-      {!options.length && <p>No matching commands. Try a different word.</p>}
-      <button onClick={close} className="mt-3 rounded border border-line p-3">
-        Close palette
-      </button>
+      {!options.length && (
+        <p className="command-empty">No matching commands. Try a different word.</p>
+      )}
+      <footer className="command-footer" aria-hidden="true">
+        <span>
+          <kbd>Up</kbd>
+          <kbd>Down</kbd> Navigate
+        </span>
+        <span>
+          <CornerDownLeft size={14} /> Open
+        </span>
+        <span>
+          <kbd>Esc</kbd> Close
+        </span>
+      </footer>
     </dialog>
   );
 }

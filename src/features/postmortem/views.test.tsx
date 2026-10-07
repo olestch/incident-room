@@ -196,6 +196,34 @@ it('clean Action Item adopts newer status; read-only card is textual and keyboar
   );
   await waitFor(() => expect(screen.getByLabelText('Action status')).toHaveValue('done'));
   view.rerender(<ActionItemView item={{ ...item, status: 'done' }} users={users} />);
-  expect(screen.getByText(/Status: done/)).toBeVisible();
+  expect(screen.getByText('Done', { exact: true })).toBeVisible();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
+it('collapsed Action Item retains dirty fields, base revision and dirty status until explicit save', async () => {
+  const save = vi.fn(async (fields, revision) => ({ ...item, ...fields, revision: revision + 1 }));
+  render(
+    <ActionEditor
+      initiallyExpanded={false}
+      item={item}
+      users={users}
+      save={save}
+      changed={vi.fn()}
+    />,
+  );
+  const edit = screen.getByRole('button', { name: 'Edit Action Item' });
+  expect(edit).toHaveAttribute('aria-expanded', 'false');
+  await userEvent.click(edit);
+  await userEvent.type(screen.getByLabelText('Action description'), 'Local follow-up');
+  await userEvent.click(screen.getByRole('button', { name: 'Close editor' }));
+  expect(screen.getByText(/Unsaved changes/)).toBeVisible();
+  expect(save).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', { name: 'Edit Action Item' }));
+  expect(screen.getByLabelText('Action description')).toHaveValue('Local follow-up');
+  await userEvent.click(screen.getByRole('button', { name: 'Save Action Item' }));
+  await screen.findByText('Saved.');
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ description: 'Local follow-up' }), 1);
+  await userEvent.type(screen.getByLabelText('Action description'), ' more');
+  expect(screen.queryByText('Saved.')).not.toBeInTheDocument();
+  expect(screen.getByText(/Unsaved changes/)).toBeVisible();
 });

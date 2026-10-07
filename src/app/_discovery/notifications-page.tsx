@@ -1,7 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  useQuery,
+  skipToken,
+} from '@tanstack/react-query';
 import { z } from 'zod';
 import {
   notificationKeys,
@@ -9,10 +15,12 @@ import {
   notificationDestination,
   unreadSchema,
   type Notification,
+  type UnreadSummary,
 } from '@/entities/notification/model';
 import { NotificationInbox } from '@/features/notifications/views';
 import { useSessionRuntime } from '@/app/_providers/session-provider';
 import { cacheNotification, cacheUnread } from './notification-cache';
+import { InlineAlert } from '@/shared/ui/primitives';
 import { useCommands } from './commands-context';
 export function NotificationsPage() {
   const { state } = useSessionRuntime();
@@ -31,6 +39,11 @@ function IdentityInbox({ userId, workspaceId }: { userId: string; workspaceId: s
   const router = useRouter();
   const commands = useCommands();
   const [issue, setIssue] = useState(false);
+  const unread = useQuery<UnreadSummary>({
+    queryKey: notificationKeys.unread(userId, workspaceId),
+    queryFn: skipToken,
+    enabled: false,
+  });
   const inbox = useInfiniteQuery({
     queryKey: notificationKeys.inbox(userId, workspaceId),
     initialPageParam: null as string | null,
@@ -92,25 +105,23 @@ function IdentityInbox({ userId, workspaceId }: { userId: string; workspaceId: s
   );
   return (
     <>
-      {inbox.isLoading ? (
-        <p role="status">Loading Notifications…</p>
-      ) : (
-        <NotificationInbox
-          items={[...unique.values()]}
-          busy={mutation.isPending || inbox.isFetchingNextPage}
-          activate={(item) => void activate(item)}
-          mark={(item, read) => void mark(item.id, read).catch(() => {})}
-          markAll={() => void mark(null, true).catch(() => {})}
-          more={Boolean(inbox.hasNextPage)}
-          loadMore={() => void inbox.fetchNextPage({ cancelRefetch: false })}
-          error={inbox.isError}
-          retry={() => void inbox.refetch()}
-        />
-      )}
+      <NotificationInbox
+        loading={inbox.isLoading}
+        unreadCount={unread.data?.count}
+        items={[...unique.values()]}
+        busy={mutation.isPending || inbox.isFetchingNextPage}
+        activate={(item) => void activate(item)}
+        mark={(item, read) => void mark(item.id, read).catch(() => {})}
+        markAll={() => void mark(null, true).catch(() => {})}
+        more={Boolean(inbox.hasNextPage)}
+        loadMore={() => void inbox.fetchNextPage({ cancelRefetch: false })}
+        error={inbox.isError}
+        retry={() => void inbox.refetch()}
+      />
       {issue && (
-        <p role="alert">
+        <InlineAlert className="secondary-page secondary-mutation-alert">
           Read state was not saved. You can retry from the inbox; navigation remains available.
-        </p>
+        </InlineAlert>
       )}
     </>
   );

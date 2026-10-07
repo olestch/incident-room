@@ -1,4 +1,7 @@
 'use client';
+import { Search, SearchX } from 'lucide-react';
+import { EmptyState, RowSkeletons } from '@/shared/ui/secondary-feedback';
+import { Button, InlineAlert } from '@/shared/ui/primitives';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -68,81 +71,109 @@ function IdentitySearch({ userId, workspaceId }: { userId: string; workspaceId: 
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
   const pendingInput = normalizeSearch(input) !== committed;
   return (
-    <section>
-      <h1 className="text-3xl font-semibold">Search</h1>
-      <label className="mt-4 block">
-        Search accessible content
-        <input
-          aria-label="Search accessible content"
-          value={input}
-          maxLength={200}
-          onChange={(event) => setInput(event.target.value)}
-          className="block w-full rounded-lg border border-line p-3"
-          type="search"
-        />
-      </label>
-      <label className="my-4 block">
-        Result type
-        <select
-          aria-label="Result type"
-          value={type ?? ''}
-          onChange={(event) => {
-            const next = new URLSearchParams(params.toString());
-            if (event.target.value) next.set('type', event.target.value);
-            else next.delete('type');
-            router.push(`/app/search?${next}`);
-          }}
-          className="ml-3 rounded border border-line p-2"
-        >
-          <option value="">All types</option>
-          {searchTypes.map((value) => (
-            <option key={value} value={value}>
-              {value.replaceAll('_', ' ')}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!committed && !pendingInput ? (
-        <p>Search incidents, messages and workspace users.</p>
-      ) : committed.length < 2 && !pendingInput ? (
-        <p>Enter at least two characters.</p>
-      ) : committed.length > 200 && !pendingInput ? (
-        <p role="alert">Search queries must be at most 200 characters.</p>
-      ) : pendingInput || query.isLoading ? (
-        <p role="status">Searching…</p>
-      ) : (
-        <>
-          {query.isError && (
-            <div role="alert">
-              <p>Search unavailable. Your query is preserved.</p>
-              <button onClick={() => void query.refetch()} className="underline">
-                Retry Search
-              </button>
-            </div>
-          )}
-          {query.data && (
-            <>
-              <p role="status">
-                {items.length} results shown
-                {!items.length ? ` for “${committed}”. Try different words.` : '.'}
-              </p>
-              <SearchResults items={items} query={committed} />
-              <button onClick={() => void query.refetch()} className="my-3 underline">
-                Refresh Search
-              </button>
-            </>
-          )}
-          {query.hasNextPage && (
-            <button
-              className="block rounded-lg border border-line p-3"
-              disabled={query.isFetchingNextPage}
-              onClick={() => void query.fetchNextPage({ cancelRefetch: false })}
-            >
-              {query.isFetchingNextPage ? 'Loading more…' : 'Load more results'}
-            </button>
-          )}
-        </>
-      )}
+    <section className="secondary-page discovery-page">
+      <header className="secondary-page-header">
+        <p className="secondary-eyebrow">Workspace discovery</p>
+        <h1>Search</h1>
+        <p>Find an Incident, a conversation or a person in your workspace.</p>
+      </header>
+      <div className="search-controls">
+        <label className="search-query-label">
+          Search accessible content
+          <input
+            aria-label="Search accessible content"
+            value={input}
+            maxLength={200}
+            onChange={(event) => setInput(event.target.value)}
+            className="search-query"
+            type="search"
+          />
+        </label>
+        <label className="search-type-label">
+          Result type
+          <select
+            aria-label="Result type"
+            value={type ?? ''}
+            onChange={(event) => {
+              const next = new URLSearchParams(params.toString());
+              if (event.target.value) next.set('type', event.target.value);
+              else next.delete('type');
+              router.push(`/app/search?${next}`);
+            }}
+            className="secondary-control"
+          >
+            <option value="">All types</option>
+            {searchTypes.map((value) => (
+              <option key={value} value={value}>
+                {
+                  {
+                    incident: 'Incidents',
+                    timeline_message: 'Timeline',
+                    thread_message: 'Threads',
+                    user: 'People',
+                  }[value]
+                }
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="secondary-surface search-results-surface">
+        {!committed && !pendingInput ? (
+          <EmptyState icon={Search} title="Find the context you need">
+            <p>Search incidents, messages and workspace users.</p>
+          </EmptyState>
+        ) : committed.length < 2 && !pendingInput ? (
+          <EmptyState icon={Search} title="Keep typing">
+            <p>Enter at least two characters.</p>
+          </EmptyState>
+        ) : committed.length > 200 && !pendingInput ? (
+          <p role="alert">Search queries must be at most 200 characters.</p>
+        ) : pendingInput || query.isLoading ? (
+          <RowSkeletons label="Searching…" />
+        ) : (
+          <>
+            {query.isError && (
+              <InlineAlert>
+                <p>Search unavailable. Your query is preserved.</p>
+                <Button onClick={() => void query.refetch()} variant="quiet">
+                  Retry Search
+                </Button>
+              </InlineAlert>
+            )}
+            {query.data && (
+              <>
+                <p role="status" className="search-results-count">
+                  {items.length} results shown
+                  {!items.length ? ` for “${committed}”. Try different words.` : '.'}
+                </p>
+                {!items.length && (
+                  <EmptyState icon={SearchX} title="No matches">
+                    <p>Try different words or another result type.</p>
+                  </EmptyState>
+                )}
+                <SearchResults items={items} query={committed} />
+                <Button
+                  onClick={() => void query.refetch()}
+                  variant="quiet"
+                  className="search-refresh"
+                >
+                  Refresh Search
+                </Button>
+              </>
+            )}
+            {query.hasNextPage && (
+              <Button
+                className="secondary-more"
+                disabled={query.isFetchingNextPage}
+                onClick={() => void query.fetchNextPage({ cancelRefetch: false })}
+              >
+                {query.isFetchingNextPage ? 'Loading more…' : 'Load more results'}
+              </Button>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 }
