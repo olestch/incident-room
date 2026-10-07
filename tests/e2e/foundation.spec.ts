@@ -6,10 +6,15 @@ test('public shell supports keyboard access and a narrow viewport without runtim
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page).toHaveTitle('Incident Room');
-  await expect(page.getByRole('heading', { name: 'Incident Room', exact: true })).toBeVisible();
+  await expect(page).toHaveTitle('Incident Room — Coordinate the response');
   await expect(
-    page.getByRole('heading', { name: 'Realtime coordination, from investigation to Postmortem' }),
+    page.getByRole('heading', {
+      name: 'Coordinate the response. Keep the full story.',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Context holds. Even when the connection doesn’t.' }),
   ).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
@@ -26,5 +31,10 @@ test('an unknown route offers recovery to the public shell', async ({ page }) =>
   expect(response?.status()).toBe(404);
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   await page.getByRole('link', { name: 'Return to Incident Room' }).click();
-  await expect(page.getByRole('heading', { name: 'Incident Room', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Coordinate the response. Keep the full story.',
+      exact: true,
+    }),
+  ).toBeVisible();
 });

@@ -2,6 +2,9 @@
 import { useRef, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { AppError } from '@/shared/errors/app-error';
+import { Eye, EyeOff } from 'lucide-react';
+import { Button, InlineAlert } from '@/shared/ui/primitives';
+import { DEMO_ACCOUNT } from './demo-account';
 import { loginSchema, registrationSchema, resetSchema } from './auth-schemas';
 
 export type AuthMode = 'login' | 'register' | 'forgot-password';
@@ -42,6 +45,8 @@ export function AuthForm({
     register,
     handleSubmit,
     resetField,
+    setValue,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<AuthValues>({
     resolver: resolver(mode),
@@ -49,7 +54,9 @@ export function AuthForm({
   });
   const [failure, setFailure] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const errorRef = useRef<HTMLParagraphElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState<Partial<Record<keyof AuthValues, boolean>>>({});
+  const [demoFilled, setDemoFilled] = useState(false);
   const pending = useRef(false);
   const fields: { name: keyof AuthValues; label: string; type: string; autocomplete: string }[] = [
     ...(mode === 'register'
@@ -84,7 +91,7 @@ export function AuthForm({
   ];
   if (confirmed)
     return (
-      <p role="status" className="rounded-lg border border-line p-4">
+      <p role="status" className="auth-recovery-result">
         If an account exists for this email, reset instructions have been requested. No real email
         is sent in this demo.
       </p>
@@ -94,7 +101,7 @@ export function AuthForm({
       noValidate
       aria-label={titles[mode]}
       aria-busy={isSubmitting}
-      className="space-y-5"
+      className="auth-form"
       onSubmit={(event) => {
         void handleSubmit(async (values) => {
           if (pending.current) return;
@@ -113,6 +120,8 @@ export function AuthForm({
           } finally {
             resetField('password');
             resetField('confirmation');
+            setVisible({});
+            setDemoFilled(false);
             pending.current = false;
           }
           requestAnimationFrame(() => errorRef.current?.focus());
@@ -121,19 +130,39 @@ export function AuthForm({
     >
       {fields.map((field) => (
         <div key={field.name}>
-          <label className="mb-2 block font-medium" htmlFor={field.name}>
+          <label className="auth-field-label" htmlFor={field.name}>
             {field.label}
           </label>
-          <input
-            {...register(field.name)}
-            id={field.name}
-            type={field.type}
-            autoComplete={field.autocomplete}
-            maxLength={field.name === 'name' ? 80 : field.name === 'email' ? 254 : 128}
-            aria-invalid={Boolean(errors[field.name])}
-            aria-describedby={errors[field.name] ? `${field.name}-error` : undefined}
-            className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2"
-          />
+          <div className="auth-input-wrap">
+            <input
+              {...register(field.name)}
+              id={field.name}
+              type={field.type === 'password' && visible[field.name] ? 'text' : field.type}
+              autoComplete={field.autocomplete}
+              maxLength={field.name === 'name' ? 80 : field.name === 'email' ? 254 : 128}
+              aria-invalid={Boolean(errors[field.name])}
+              aria-describedby={errors[field.name] ? `${field.name}-error` : undefined}
+              className={`auth-input ${field.type === 'password' ? 'auth-password-input' : ''}`}
+            />
+            {field.type === 'password' && (
+              <Button
+                variant="quiet"
+                className="auth-password-toggle"
+                aria-label={`${visible[field.name] ? 'Hide' : 'Show'} ${field.name === 'confirmation' ? 'password confirmation' : 'password'}`}
+                aria-controls={field.name}
+                aria-pressed={Boolean(visible[field.name])}
+                onClick={() =>
+                  setVisible((current) => ({ ...current, [field.name]: !current[field.name] }))
+                }
+              >
+                {visible[field.name] ? (
+                  <EyeOff size={18} aria-hidden="true" />
+                ) : (
+                  <Eye size={18} aria-hidden="true" />
+                )}
+              </Button>
+            )}
+          </div>
           {errors[field.name] && (
             <p id={`${field.name}-error`} className="mt-2 text-sm text-critical">
               {errors[field.name]?.message}
@@ -142,25 +171,55 @@ export function AuthForm({
         </div>
       ))}
       {failure && (
-        <p
-          ref={errorRef}
-          tabIndex={-1}
-          role="alert"
-          className="rounded-lg border border-critical p-3 text-critical"
-        >
+        <InlineAlert ref={errorRef} tabIndex={-1}>
           {failure}
-        </p>
+        </InlineAlert>
       )}
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="min-h-11 w-full rounded-lg bg-ink px-4 py-3 font-semibold text-white disabled:opacity-60"
-      >
+      <Button variant="primary" type="submit" disabled={isSubmitting} className="auth-submit">
         {isSubmitting ? 'Please wait…' : titles[mode]}
-      </button>
-      <p role="status" className="text-sm text-muted">
-        {isSubmitting ? 'Submitting your request.' : ''}
+      </Button>
+      <p role="status" className="auth-submit-status">
+        {isSubmitting
+          ? 'Submitting your request.'
+          : demoFilled
+            ? 'Demo credentials filled. Select Sign in to continue.'
+            : ''}
       </p>
+      {mode === 'login' && (
+        <div className="auth-demo-account">
+          <div className="auth-demo-heading">
+            <strong>Demo account</strong>
+            <span>Fictional</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Email</dt>
+              <dd>{DEMO_ACCOUNT.email}</dd>
+            </div>
+            <div>
+              <dt>Password</dt>
+              <dd>{DEMO_ACCOUNT.password}</dd>
+            </div>
+          </dl>
+          <Button
+            className="auth-demo-fill"
+            disabled={isSubmitting}
+            onClick={() => {
+              setValue('email', DEMO_ACCOUNT.email, { shouldDirty: true, shouldValidate: true });
+              setValue('password', DEMO_ACCOUNT.password, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+              setFailure(null);
+              setDemoFilled(true);
+              setFocus('password');
+            }}
+          >
+            Use demo account
+          </Button>
+          <p>Fills the form. Sign in when you’re ready.</p>
+        </div>
+      )}
     </form>
   );
 }

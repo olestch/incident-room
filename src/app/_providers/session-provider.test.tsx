@@ -5,7 +5,7 @@ import { HttpSessionAdapter } from '@/features/session/http-session-adapter';
 import { SessionCoordinator } from '@/features/session/session-coordinator';
 import type { SessionEnvelope, SessionState } from '@/features/session/session-model';
 import { AppProviders } from './app-providers';
-import { SessionProvider, useSessionRuntime } from './session-provider';
+import { SessionProgress, SessionProvider, useSessionRuntime } from './session-provider';
 
 const mock = vi.hoisted(() => ({ start: vi.fn<() => Promise<void>>() }));
 // Mock the worker port, not concurrent dynamic imports of the app startup module.
@@ -52,6 +52,17 @@ function Probe({ states }: { states: SessionState[] }) {
 
 beforeEach(() => {
   mock.start.mockReset();
+});
+
+it('renders the session transition immediately as a branded live status with a focusable main', () => {
+  const view = render(<SessionProgress />);
+  expect(screen.getByRole('status')).toHaveTextContent('Restoring your session…');
+  expect(screen.getByText('Incident Room')).toBeVisible();
+  expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+  expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1');
+  view.rerender(<SessionProgress>Opening your workspace…</SessionProgress>);
+  expect(screen.getByRole('status')).toHaveTextContent('Opening your workspace…');
+  expect(screen.getAllByRole('status')).toHaveLength(1);
 });
 
 it('Strict Mode replay stays restoring until MSW and the authenticated result are ready', async () => {

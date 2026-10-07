@@ -2,6 +2,7 @@
 @import './_shell/shell.css';
 @import '../features/incident-management/discovery.css';
 @import './_incidents/room.css';
+@import './_public/public.css';
 
 .command-dialog {
   margin: auto;

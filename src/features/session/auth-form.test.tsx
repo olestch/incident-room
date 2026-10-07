@@ -3,6 +3,49 @@ import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { AppError } from '@/shared/errors/app-error';
 import { AuthForm } from './auth-form';
+import { DEMO_ACCOUNT } from './demo-account';
+import { DEMO_PASSWORD } from './mock/authority';
+
+it('fills the authoritative demo credentials without submitting and signs in through the form', async () => {
+  const user = userEvent.setup();
+  const submit = vi.fn(async () => {});
+  render(<AuthForm mode="login" submit={submit} />);
+  expect(DEMO_ACCOUNT.password).toBe(DEMO_PASSWORD);
+  await user.click(screen.getByRole('button', { name: 'Use demo account' }));
+  expect(screen.getByLabelText('Email')).toHaveValue(DEMO_ACCOUNT.email);
+  expect(screen.getByLabelText('Password')).toHaveValue(DEMO_ACCOUNT.password);
+  expect(screen.getByLabelText('Password')).toHaveFocus();
+  expect(screen.getByRole('status')).toHaveTextContent('Select Sign in to continue');
+  expect(submit).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+  expect(submit).toHaveBeenCalledWith(expect.objectContaining(DEMO_ACCOUNT));
+  expect(screen.getByLabelText('Password')).toHaveValue('');
+});
+
+it('toggles each registration password independently without changing values or submitting', async () => {
+  const user = userEvent.setup();
+  const submit = vi.fn();
+  render(<AuthForm mode="register" submit={submit} />);
+  const password = screen.getByLabelText('Password', { exact: true });
+  const confirmation = screen.getByLabelText('Confirm password');
+  await user.type(password, 'Fictional-pass-42');
+  await user.type(confirmation, 'Fictional-pass-42');
+  await user.click(screen.getByRole('button', { name: 'Show password' }));
+  expect(password).toHaveAttribute('type', 'text');
+  expect(confirmation).toHaveAttribute('type', 'password');
+  expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await user.click(screen.getByRole('button', { name: 'Show password confirmation' }));
+  expect(confirmation).toHaveAttribute('type', 'text');
+  await user.click(screen.getByRole('button', { name: 'Hide password' }));
+  expect(password).toHaveAttribute('type', 'password');
+  expect(password).toHaveValue('Fictional-pass-42');
+  expect(confirmation).toHaveValue('Fictional-pass-42');
+  expect(submit).not.toHaveBeenCalled();
+});
 
 it('validates login fields, associates errors and focuses the first invalid field', async () => {
   const user = userEvent.setup();

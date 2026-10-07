@@ -76,7 +76,7 @@ test('landing login, room navigation and a second logout/login cycle remain stab
   page,
 }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'Sign in to the fictional workspace' }).click();
+  await page.getByRole('link', { name: 'Explore demo', exact: true }).click();
   await signIn(page);
   await stableApp(page);
   await page

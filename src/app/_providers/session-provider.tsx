@@ -1,4 +1,6 @@
 'use client';
+import { BrandMark, SignalChannels } from '@/shared/ui/brand';
+import { Button, InlineAlert } from '@/shared/ui/primitives';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { currentUserKey } from '@/entities/current-user/model';
@@ -104,19 +106,34 @@ export function SessionProgress({
   children?: ReactNode;
 }) {
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-lg px-6 py-16">
-      <p role="status">{children}</p>
+    <main id="main-content" tabIndex={-1} className="session-state">
+      <SignalChannels />
+      <div className="session-state-card">
+        <BrandMark />
+        <p className="session-state-brand">Incident Room</p>
+        <p role="status">{children}</p>
+        <div className="session-state-progress" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
     </main>
   );
 }
 export function SessionIssue() {
   const { issue, retry } = useSessionRuntime();
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-lg px-6 py-16">
-      <p role="alert">{issue}</p>
-      <button onClick={retry} className="mt-4 underline">
-        Retry session restoration
-      </button>
+    <main id="main-content" tabIndex={-1} className="session-state">
+      <SignalChannels />
+      <div className="session-state-card">
+        <BrandMark />
+        <p className="session-state-brand">Incident Room</p>
+        <InlineAlert>{issue}</InlineAlert>
+        <Button onClick={retry} className="mt-4" variant="primary">
+          Retry session restoration
+        </Button>
+      </div>
     </main>
   );
 }

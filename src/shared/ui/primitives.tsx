@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 import { Info } from 'lucide-react';
 
 export function Button({
@@ -50,9 +50,9 @@ export function Avatar({ name }: { name: string }) {
   );
 }
 
-export function InlineAlert({ children }: { children: ReactNode }) {
+export function InlineAlert({ children, className = '', ...props }: ComponentProps<'div'>) {
   return (
-    <div className="ui-alert" role="alert">
+    <div className={`ui-alert ${className}`} role="alert" {...props}>
       <Info size={18} aria-hidden="true" />
       <div>{children}</div>
     </div>
