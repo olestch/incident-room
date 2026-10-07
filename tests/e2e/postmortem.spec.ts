@@ -1,3 +1,4 @@
+import { navigateApp } from './shell-helpers';
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 const number = 'INC-2865';
 async function login(page: Page, email = 'river.vale@example.test') {
@@ -285,7 +286,7 @@ test('assignment notification links to canonical Postmortem and does not spam on
   await item.getByLabel('Action status', { exact: true }).selectOption('done');
   await item.getByRole('button', { name: 'Save Action Item', exact: true }).click();
   await expect(item.getByText('Saved.', { exact: true })).toBeVisible();
-  await second.getByRole('link', { name: 'Notifications', exact: true }).click();
+  await navigateApp(second, 'Notifications');
   const inbox = second.getByRole('list', { name: 'Notifications', exact: true });
   await expect(inbox.getByRole('listitem')).toHaveCount(2);
   await inbox

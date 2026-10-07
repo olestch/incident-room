@@ -431,6 +431,12 @@ These details supplement the concise README controls; they describe existing beh
 - **Reset:** confirmed exclusive maintenance disposes/drains session/local work and finishes in-flight mock requests before clearing eight explicit fictional/local stores. This removes accounts/leases, created Incidents, Timeline/Threads, Notifications, Postmortems/Actions and all drafts/outbox, then returns to login; lazy defaults restore on read. It does not delete databases or clear unrelated origin storage. Maintenance across databases is not globally atomic: after a storage failure, reload/check storage and retry reset before trusting partial state.
 - **Clear simulations:** changes configuration only; persistent data remains. Configuration is tab-local and resets on full reload. Close other loaded app tabs before replacement/reset; unsupported Web Locks refuses maintenance safely.
 
+## 47. Application shell presentation invariant
+
+The authenticated shell keeps one feature-content tree across expanded, compact and drawer navigation. Drawer visibility and the user popover are local presentation state; they do not recreate identity providers, Query, Redux, realtime or Demo runtimes. Native modal dialogs retain their content while closed, so Demo operation feedback survives dismissal. Shell layout adds no scrolling/overflow ancestor around the Timeline viewport. One authoritative unread Query subscription supplies both navigation affordances.
+
+Basic presentation primitives live in `shared/ui`; domain badge variants live in `features/incident-management`. Tailwind 4 maps raw palette values to semantic surface, interaction, typography and domain tokens. Lucide React supplies named, tree-shakeable icons; native dialog/popover behavior supplies shell overlays without a second headless-component dependency.
+
 ## Public implementation references
 
 - [Next.js installation and current App Router tooling](https://nextjs.org/docs/app/getting-started/installation)

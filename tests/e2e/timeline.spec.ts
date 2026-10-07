@@ -1,3 +1,4 @@
+import { signOut } from './shell-helpers';
 import { expect, test, type Page } from '@playwright/test';
 import { generateTimeline } from '@/features/timeline/fixtures';
 import type { AuthorityData } from '@/features/timeline/authority';
@@ -391,7 +392,7 @@ test('logout clears identity drafts/outbox and another user cannot restore them'
   await send(page, 'Private fictional local work');
   await expect(page.getByRole('button', { name: 'Retry message', exact: true })).toBeEnabled();
   await page.getByLabel('Message', { exact: true }).fill('Private fictional draft');
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await signOut(page);
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   const data = await database<LocalData>(page, 'incident-room-local-work-v1', localKey);
   expect(data.outbox).toHaveLength(0);

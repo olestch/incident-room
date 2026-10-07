@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { Bell, Command as CommandIcon, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +11,7 @@ import {
   searchDestination,
   normalizeSearch,
 } from '@/entities/search/model';
-import { UnreadBadge } from '@/features/notifications/views';
+import { Button } from '@/shared/ui/primitives';
 import { CommandPalette } from '@/features/command-palette/views';
 import { commandRegistry, paletteShortcut, type Command } from '@/features/command-palette/model';
 import { useSessionRuntime } from '@/app/_providers/session-provider';
@@ -21,12 +22,13 @@ import { createDiagnostics } from '@/shared/diagnostics/diagnostics';
 export function DiscoveryControls({
   userId,
   workspaceId,
+  unreadCount,
 }: {
   userId: string;
   workspaceId: string;
+  unreadCount: number | undefined;
 }) {
   const { coordinator, adapter } = useSessionRuntime();
-  const cache = useQueryClient();
   const pathname = usePathname();
   const params = useSearchParams();
   const router = useRouter();
@@ -43,20 +45,6 @@ export function DiscoveryControls({
     [appCommands],
   );
   useListRealtime(!/^\/app\/incidents\/INC-\d+\/?$/.test(pathname), userId, workspaceId);
-  const unread = useQuery({
-    queryKey: notificationKeys.unread(userId, workspaceId),
-    queryFn: async ({ signal }) =>
-      cacheUnread(
-        cache,
-        userId,
-        workspaceId,
-        await coordinator.request(
-          (s) => adapter.resource('/notifications/unread', unreadSchema, s),
-          'safe-read',
-          signal,
-        ),
-      ),
-  });
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(normalizeSearch(input)), 200);
     return () => clearTimeout(timer);
@@ -116,31 +104,51 @@ export function DiscoveryControls({
       destination: `/app/search?${new URLSearchParams({ q: normalizeSearch(input) })}`,
     });
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      {appCommands?.readNotice && (
-        <div role="alert">
-          Read state was not saved. Navigation is still available; retry from the inbox.{' '}
-          <button className="underline" onClick={appCommands.dismissReadNotice}>
-            Dismiss read notice
-          </button>
-        </div>
-      )}
+    <>
+      <Link
+        href="/app/search"
+        aria-label="Search workspace"
+        title="Search workspace"
+        className="shell-action"
+        onNavigate={(event) => {
+          if (!(appCommands?.canLeave() ?? true)) event.preventDefault();
+        }}
+      >
+        <Search size={18} aria-hidden="true" />
+        <span className="shell-action-label">Search</span>
+      </Link>
       <Link
         href="/app/notifications"
-        aria-label={`Activity Inbox${unread.data ? `, ${unread.data.count} unread notifications` : ''}`}
-        className="underline"
+        aria-label={`Activity Inbox, ${unreadCount === undefined ? 'unread count unavailable' : `${unreadCount} unread notifications`}`}
+        title="Notifications"
+        className="shell-action"
+        onNavigate={(event) => {
+          if (!(appCommands?.canLeave() ?? true)) event.preventDefault();
+        }}
       >
-        Inbox <UnreadBadge count={unread.data?.count} />
+        <Bell size={18} aria-hidden="true" />
+        {unreadCount !== undefined && unreadCount > 0 && (
+          <span className="shell-unread" aria-hidden="true">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
       </Link>
-      <button
-        className="rounded-lg border border-line px-3 py-2"
+      <Button
+        variant="quiet"
+        aria-label="Commands"
+        title="Commands (Ctrl/Cmd+K)"
+        className="shell-action"
         onClick={() => {
           setInput('');
           setOpen(true);
         }}
       >
-        Commands
-      </button>
+        <CommandIcon size={18} aria-hidden="true" />
+        <span className="shell-action-label">Commands</span>
+        <kbd className="shell-command-key" aria-hidden="true">
+          Ctrl/⌘ K
+        </kbd>
+      </Button>
       {open && (
         <CommandPalette
           commands={commandRegistry(pathname, new URLSearchParams(params.toString()), true, userId)}
@@ -160,6 +168,26 @@ export function DiscoveryControls({
           }}
         />
       )}
-    </div>
+    </>
   );
+}
+
+/** One authoritative Query subscription shared by the two navigation affordances. */
+export function useShellUnread(userId: string, workspaceId: string) {
+  const { coordinator, adapter } = useSessionRuntime();
+  const cache = useQueryClient();
+  return useQuery({
+    queryKey: notificationKeys.unread(userId, workspaceId),
+    queryFn: async ({ signal }) =>
+      cacheUnread(
+        cache,
+        userId,
+        workspaceId,
+        await coordinator.request(
+          (s) => adapter.resource('/notifications/unread', unreadSchema, s),
+          'safe-read',
+          signal,
+        ),
+      ),
+  });
 }

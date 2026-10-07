@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './_shell/shell.css';
 
 .command-dialog {
   margin: auto;
@@ -37,18 +38,92 @@
   }
 }
 
-@theme {
-  --font-sans: Arial, Helvetica, sans-serif;
-  --color-canvas: #f8fafc;
-  --color-surface: #ffffff;
-  --color-ink: #0f172a;
-  --color-muted: #475569;
-  --color-line: #cbd5e1;
-  --color-focus: #1d4ed8;
-  --color-critical: #991b1b;
-  --color-high: #9a3412;
-  --color-medium: #854d0e;
-  --color-low: #334155;
+:root {
+  --palette-white: #ffffff;
+  --palette-slate-25: #f5f7fa;
+  --palette-slate-50: #eef2f6;
+  --palette-slate-200: #d8e0e8;
+  --palette-slate-500: #7c8b9c;
+  --palette-slate-600: #5f6f82;
+  --palette-slate-700: #475569;
+  --palette-slate-800: #334155;
+  --palette-slate-950: #172b3a;
+  --palette-teal-50: #e6f4f1;
+  --palette-teal-700: #0f766e;
+  --palette-teal-800: #115e59;
+  --palette-blue-50: #eff6ff;
+  --palette-blue-600: #2563eb;
+  --palette-blue-700: #1d4ed8;
+  --palette-red-50: #fef3f2;
+  --palette-red-700: #b42318;
+  --palette-orange-50: #fff4ed;
+  --palette-orange-800: #9a3412;
+  --palette-amber-50: #fffbeb;
+  --palette-amber-800: #854d0e;
+  --palette-green-50: #f0fdf4;
+  --palette-green-800: #166534;
+  --palette-violet-50: #f5f3ff;
+  --palette-violet-700: #6d28d9;
+  --shell-topbar-height: 3.5rem;
+  --shell-nav-compact: 4rem;
+  --shell-nav-expanded: 13.5rem;
+  --elevation-overlay: 0 12px 36px rgb(23 43 58 / 14%);
+  --overlay-scrim: rgb(23 43 58 / 30%);
+}
+
+@theme inline {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  --color-canvas: var(--palette-slate-25);
+  --color-surface: var(--palette-white);
+  --color-surface-secondary: var(--palette-slate-50);
+  --color-surface-elevated: var(--palette-white);
+  --color-ink: var(--palette-slate-950);
+  --color-secondary: var(--palette-slate-700);
+  --color-muted: var(--palette-slate-600);
+  --color-line: var(--palette-slate-200);
+  --color-control-border: var(--palette-slate-500);
+  --color-accent: var(--palette-teal-700);
+  --color-accent-hover: var(--palette-teal-800);
+  --color-accent-soft: var(--palette-teal-50);
+  --color-focus: var(--palette-blue-600);
+  --color-critical: var(--palette-red-700);
+  --color-critical-soft: var(--palette-red-50);
+  --color-high: var(--palette-orange-800);
+  --color-high-soft: var(--palette-orange-50);
+  --color-medium: var(--palette-amber-800);
+  --color-medium-soft: var(--palette-amber-50);
+  --color-low: var(--palette-slate-800);
+  --color-low-soft: var(--palette-slate-50);
+  --color-success: var(--palette-green-800);
+  --color-success-soft: var(--palette-green-50);
+  --color-warning: var(--palette-amber-800);
+  --color-warning-soft: var(--palette-amber-50);
+  --color-danger: var(--palette-red-700);
+  --color-danger-soft: var(--palette-red-50);
+  --color-info: var(--palette-blue-700);
+  --color-info-soft: var(--palette-blue-50);
+  --color-identified: var(--palette-violet-700);
+  --color-identified-soft: var(--palette-violet-50);
+  --radius-small: 0.25rem;
+  --radius-control: 0.375rem;
+  --radius-panel: 0.5rem;
+  --radius-dialog: 0.75rem;
+  --text-page: 1.75rem;
+  --text-page--line-height: 2.125rem;
+  --text-product: 1.375rem;
+  --text-product--line-height: 1.75rem;
+  --text-section: 1.125rem;
+  --text-section--line-height: 1.5rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.375rem;
+  --text-control: 0.875rem;
+  --text-control--line-height: 1.25rem;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.125rem;
+  --text-time: 0.75rem;
+  --text-time--line-height: 1rem;
   --breakpoint-md: 48rem;
   --breakpoint-lg: 64rem;
 }

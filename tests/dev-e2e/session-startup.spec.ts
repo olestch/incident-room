@@ -1,3 +1,4 @@
+import { navigateApp, signOut } from './shell-helpers';
 import { expect, test, type Page } from '@playwright/test';
 
 const browserErrors = new WeakMap<Page, string[]>();
@@ -84,9 +85,9 @@ test('landing login, room navigation and a second logout/login cycle remain stab
     .first()
     .click();
   await expect(page.getByRole('heading', { name: /INC-\d+/, level: 1 })).toBeVisible();
-  await page.getByRole('link', { name: 'Incidents', exact: true }).click();
+  await navigateApp(page, 'Incidents');
   await stableApp(page);
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await signOut(page);
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   await page.goto('/app/incidents');
   await expect(page).toHaveURL('/login?returnTo=%2Fapp%2Fincidents');

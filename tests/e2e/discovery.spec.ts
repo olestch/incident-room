@@ -1,3 +1,4 @@
+import { navigateApp, signOut } from './shell-helpers';
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 const incident = 'fictional-incident-2841';
 async function searchCounters(page: Page) {
@@ -36,9 +37,11 @@ async function pair(context: BrowserContext, page: Page) {
   await context.clearCookies();
   const second = await context.newPage();
   await login(second, 'sage.linden@example.test');
-  await second.getByRole('link', { name: 'Notifications', exact: true }).click();
+  await navigateApp(second, 'Notifications');
   await expect(second.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
-  await expect(second.getByLabel('0 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
   return second;
 }
 async function mention(page: Page, index = 1) {
@@ -52,7 +55,7 @@ async function mention(page: Page, index = 1) {
   await expect(row).toHaveAttribute('data-entry-id', /^fictional-incident-2841:msg-/);
 }
 async function search(page: Page, query: string, type?: string) {
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await navigateApp(page, 'Search');
   if (type) await page.getByLabel('Result type', { exact: true }).selectOption(type);
   await page.getByLabel('Search accessible content', { exact: true }).fill(query);
   await expect(page.getByRole('list', { name: 'Search results' })).toBeVisible();
@@ -142,7 +145,7 @@ test('Search cancels delayed A and keeps B results and input focus authoritative
   await login(page);
   await room(page);
   await searchPolicy(page, 2500);
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await navigateApp(page, 'Search');
   const input = page.getByLabel('Search accessible content', { exact: true });
   const requested = page.waitForRequest(
     (request) =>
@@ -174,7 +177,7 @@ test('Search cancels delayed A and keeps B results and input focus authoritative
 });
 test('Search minimum, empty results, pagination and refresh remain distinct', async ({ page }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await navigateApp(page, 'Search');
   const input = page.getByLabel('Search accessible content', { exact: true });
   await expect(page.getByText('Search incidents, messages and workspace users.')).toBeVisible();
   await input.fill('x');
@@ -196,7 +199,7 @@ test('Search error preserves query and retries without fabricated empty result',
   await login(page);
   await room(page);
   await searchPolicy(page, 0, true);
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await navigateApp(page, 'Search');
   await page.getByLabel('Result type', { exact: true }).selectOption('incident');
   await page.getByLabel('Search accessible content', { exact: true }).fill('INC-2841');
   await expect(page.getByRole('button', { name: 'Retry Search' })).toBeVisible();
@@ -239,12 +242,16 @@ test('notification live delivery is recipient-only, unique and follows exact Tim
     client,
   );
   await mention(page);
-  await expect(second.getByLabel('1 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
+  ).toBeVisible();
   const items = second
     .getByRole('list', { name: 'Notifications', exact: true })
     .locator(':scope > li');
   await expect(items).toHaveCount(1);
-  await expect(page.getByLabel('0 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
   const link = items.getByRole('link');
   const href = await link.getAttribute('href');
   expect(href).toContain('?event=');
@@ -254,7 +261,9 @@ test('notification live delivery is recipient-only, unique and follows exact Tim
   );
   const target = new URL(second.url()).searchParams.get('event')!;
   await expect(second.locator(`[data-entry-id="${target}"]`)).toContainText('Navigation target');
-  await expect(second.getByLabel('0 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
 });
 test('mark unread and bulk read converge badge without one request per record', async ({
   page,
@@ -263,17 +272,25 @@ test('mark unread and bulk read converge badge without one request per record', 
   const second = await pair(context, page);
   await mention(page, 1);
   await mention(page, 2);
-  await expect(second.getByLabel('2 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 2 unread notifications', exact: true }),
+  ).toBeVisible();
   const rows = second
     .getByRole('list', { name: 'Notifications', exact: true })
     .locator(':scope > li');
   await expect(rows).toHaveCount(2);
   await rows.first().getByRole('button', { name: 'Mark read', exact: true }).click();
-  await expect(second.getByLabel('1 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
+  ).toBeVisible();
   await rows.first().getByRole('button', { name: 'Mark unread', exact: true }).click();
-  await expect(second.getByLabel('2 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 2 unread notifications', exact: true }),
+  ).toBeVisible();
   await second.getByRole('button', { name: 'Mark all as read' }).click();
-  await expect(second.getByLabel('0 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
   await expect(
     rows.filter({ has: second.getByRole('button', { name: 'Mark read', exact: true }) }),
   ).toHaveCount(0);
@@ -312,10 +329,14 @@ test('failed read mutation preserves canonical navigation and a visible retry no
   await link.click();
   await expect(second).toHaveURL((url) => Boolean(url.searchParams.get('event')));
   await expect(second.getByRole('button', { name: 'Dismiss read notice' })).toBeVisible();
-  await expect(second.getByLabel('1 unread notifications', { exact: true })).toBeVisible();
-  await second.getByRole('link', { name: 'Notifications', exact: true }).click();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
+  ).toBeVisible();
+  await navigateApp(second, 'Notifications');
   await second.getByRole('button', { name: 'Mark all as read' }).click();
-  await expect(second.getByLabel('0 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
 });
 test('recipient logout then another identity never restores previous inbox or unread badge', async ({
   page,
@@ -323,12 +344,16 @@ test('recipient logout then another identity never restores previous inbox or un
 }) => {
   const second = await pair(context, page);
   await mention(page);
-  await expect(second.getByLabel('1 unread notifications', { exact: true })).toBeVisible();
-  await second.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
+  ).toBeVisible();
+  await signOut(second);
   await expect(second.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   await login(second);
-  await second.getByRole('link', { name: 'Notifications', exact: true }).click();
-  await expect(second.getByLabel('0 unread notifications', { exact: true })).toBeVisible();
+  await navigateApp(second, 'Notifications');
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
   await expect(second.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
   await expect(second.getByText('No notifications.', { exact: true })).toBeVisible();
   await expect(
@@ -343,7 +368,9 @@ test('notification disconnect and expired checkpoint recover through existing re
   const second = await pair(context, page);
   await second.evaluate(() => window.dispatchEvent(new Event('offline')));
   await mention(page);
-  await expect(second.getByLabel('0 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
   await second.evaluate(
     () =>
       new Promise<void>((resolve, reject) => {
@@ -368,7 +395,9 @@ test('notification disconnect and expired checkpoint recover through existing re
       }),
   );
   await second.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect(second.getByLabel('1 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
+  ).toBeVisible();
   await expect(
     second.getByRole('list', { name: 'Notifications', exact: true }).locator(':scope > li'),
   ).toHaveCount(1);
@@ -384,12 +413,14 @@ test('Thread reply notification uses Phase 6 root/message destination', async ({
   await context.clearCookies();
   const second = await context.newPage();
   await login(second, 'sage.linden@example.test');
-  await second.getByRole('link', { name: 'Notifications', exact: true }).click();
+  await navigateApp(second, 'Notifications');
   await thread
     .getByLabel('Message', { exact: true })
     .fill('Fictional contextual notification evidence');
   await thread.getByRole('button', { name: 'Send', exact: true }).click();
-  await expect(second.getByLabel('1 unread notifications', { exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
+  ).toBeVisible();
   await second.getByRole('list', { name: 'Notifications', exact: true }).getByRole('link').click();
   await expect(second).toHaveURL((url) =>
     Boolean(url.searchParams.get('thread') && url.searchParams.get('message')),
@@ -444,7 +475,7 @@ test('mobile entries and palette are visible without overflow; editable shortcut
   page,
 }) => {
   await login(page);
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await navigateApp(page, 'Search');
   const input = page.getByLabel('Search accessible content', { exact: true });
   await input.focus();
   await page.keyboard.press('Control+k');
@@ -455,6 +486,6 @@ test('mobile entries and palette are visible without overflow; editable shortcut
     true,
   );
   await page.getByRole('button', { name: 'Close palette' }).click();
-  await page.getByRole('link', { name: 'Notifications', exact: true }).click();
+  await navigateApp(page, 'Notifications');
   await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
 });

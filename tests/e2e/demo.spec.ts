@@ -1,3 +1,4 @@
+import { openDemo, closeDemo, navigateApp } from './shell-helpers';
 import { test, expect, type Page } from '@playwright/test';
 async function login(page: Page) {
   await page.goto('/login');
@@ -7,7 +8,7 @@ async function login(page: Page) {
   await expect(page.getByRole('list', { name: 'Incidents', exact: true })).toBeVisible();
 }
 async function controls(page: Page) {
-  await page.locator('summary').filter({ hasText: 'Demo Mode' }).click();
+  await openDemo(page);
 }
 test('demo latency and seeded failures affect actual authority Search requests', async ({
   page,
@@ -15,18 +16,22 @@ test('demo latency and seeded failures affect actual authority Search requests',
   await login(page);
   await controls(page);
   await page.getByLabel('Request latency').selectOption('2000');
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await closeDemo(page);
+  await navigateApp(page, 'Search');
   const search = page.getByRole('searchbox', { name: 'Search accessible content' });
   const response = page.waitForResponse((r) => r.url().includes('/mock-api/search'));
   await search.fill('Aurora');
   await expect(page.getByText(/Searching/).first()).toBeVisible();
   expect((await response).status()).toBe(200);
+  await controls(page);
   await page.getByLabel('Failure rate').selectOption('30');
+  await closeDemo(page);
   const failure = page.waitForResponse(
     (r) => r.url().includes('/mock-api/search') && r.status() === 503,
   );
   await search.fill('Cedar');
   await failure;
+  await controls(page);
   await page.getByRole('button', { name: 'Clear simulations' }).click();
   await expect(
     page.getByText('0 ms · 0% failures · realtime connected', { exact: false }),
@@ -92,7 +97,7 @@ test('reset restores seed, clears generated persistent work and requires single 
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Reset Demo data' }).click();
   await expect(page.getByText('Demo operation unavailable.', { exact: false })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Current user')).toContainText('River Vale');
   await other.close();
   await page.getByRole('button', { name: 'Generate persistent event' }).click();
   await expect(page.getByText('Generated monitoring activity', { exact: false })).toBeVisible();
@@ -110,36 +115,24 @@ test('reset restores seed, clears generated persistent work and requires single 
   await expect(page.locator('[data-entry-id="fictional-incident-2841:evt-4000"]')).toBeVisible();
   await expect(page.locator('[data-entry-id]').filter({ hasText: 'Demo activity' })).toHaveCount(0);
 });
-test('reviewer showcase and responsive keyboard controls remain usable', async ({
-  page,
-}, testInfo) => {
+test('reviewer journeys and responsive keyboard controls remain usable', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const capture = async (name: string) => {
-    await testInfo.attach(name, {
-      body: await page.screenshot({ fullPage: true }),
-      contentType: 'image/png',
-    });
-  };
   await login(page);
-  await capture('incident-list');
   await page.goto('/app/incidents/INC-2841');
   await expect(page.getByLabel('Realtime connection', { exact: true })).toHaveText('Connected');
-  await capture('incident-timeline');
   await page
     .getByRole('button', { name: 'Open Thread for fictional-incident-2841:evt-4000', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Thread', exact: true })).toBeVisible();
   await expect(page.getByText(/Fictional contextual reply 8\./)).toBeVisible();
   await page.getByRole('button', { name: 'Back to Timeline / Close Thread', exact: true }).focus();
-  await capture('contextual-thread');
   await page.getByRole('button', { name: 'Back to Timeline / Close Thread', exact: true }).click();
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await navigateApp(page, 'Search');
   await expect(page.getByRole('heading', { name: 'Search', exact: true })).toBeVisible();
   await page.getByRole('searchbox', { name: 'Search accessible content' }).fill('Aurora');
   await expect(page.getByText(/results shown/)).toBeVisible();
-  await capture('authority-search');
-  await page.getByRole('link', { name: 'Notifications', exact: true }).click();
+  await navigateApp(page, 'Notifications');
   await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
   await controls(page);
   for (const width of [320, 768, 1280]) {
@@ -151,12 +144,10 @@ test('reviewer showcase and responsive keyboard controls remain usable', async (
   await page.getByLabel('Request latency').focus();
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Control+k');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Command Palette', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Clear simulations' }).click();
-  await capture('demo-mode');
   await page.goto('/app/incidents/INC-2865/postmortem');
   await page.getByRole('button', { name: 'Initiate Postmortem', exact: true }).click();
   await expect(page.getByRole('form', { name: 'Postmortem editor' })).toBeVisible();
-  await capture('structured-postmortem');
   expect(errors).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import { navigateApp } from './shell-helpers';
 import { expect, test, type Page } from '@playwright/test';
 
 async function login(page: Page, email = 'river.vale@example.test') {
@@ -55,7 +56,7 @@ test('My Incidents uses current stable identity; dates and participant apply to 
   page,
 }) => {
   await login(page, 'sage.linden@example.test');
-  await page.getByRole('link', { name: 'My Incidents', exact: true }).click();
+  await navigateApp(page, 'My Incidents');
   await expect(page).toHaveURL('/app/incidents?assignedToMe=true');
   await expect(page.getByLabel('Assigned to me')).toBeChecked();
   for (const row of await page
