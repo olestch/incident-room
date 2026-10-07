@@ -1,5 +1,8 @@
 'use client';
 import Link from 'next/link';
+import { X } from 'lucide-react';
+import { Button, IconButton, InlineAlert } from '@/shared/ui/primitives';
+export { IncidentFiltersView } from './list-filters';
 import { useEffect, useRef, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { AppError } from '@/shared/errors/app-error';
@@ -9,12 +12,10 @@ import {
   severities,
   severityLabels,
   services,
-  statuses,
   statusLabels,
   type CreateIncidentInput,
   type Incident,
 } from '@/entities/incident/model';
-import { emptyFilters, type IncidentFilters } from '@/entities/incident/filters';
 
 export function IncidentContext({
   incident,
@@ -114,138 +115,6 @@ export function IncidentTime({ value }: { value: string }) {
     </time>
   );
 }
-export function IncidentFiltersView({
-  filters,
-  users,
-  change,
-}: {
-  filters: IncidentFilters;
-  users: WorkspaceUser[];
-  change: (value: IncidentFilters) => void;
-}) {
-  return (
-    <section
-      aria-label="Incident filters"
-      className="my-6 space-y-4 rounded-lg border border-line bg-canvas p-4"
-    >
-      <div className="grid gap-4 md:grid-cols-2">
-        <fieldset>
-          <legend className="mb-2 font-semibold">Status</legend>
-          <div className="flex flex-wrap gap-3">
-            {statuses.map((value) => (
-              <label key={value} className="flex min-h-9 items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={filters.status.includes(value)}
-                  onChange={(e) =>
-                    change({
-                      ...filters,
-                      status: e.target.checked
-                        ? [...filters.status, value]
-                        : filters.status.filter((s) => s !== value),
-                    })
-                  }
-                />
-                {statusLabels[value]}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend className="mb-2 font-semibold">Severity</legend>
-          <div className="flex flex-wrap gap-3">
-            {severities.map((value) => (
-              <label key={value} className="flex min-h-9 items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={filters.severity.includes(value)}
-                  onChange={(e) =>
-                    change({
-                      ...filters,
-                      severity: e.target.checked
-                        ? [...filters.severity, value]
-                        : filters.severity.filter((s) => s !== value),
-                    })
-                  }
-                />
-                {value} · {severityLabels[value]}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      </div>
-      <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="space-y-1">
-          Participant
-          <select
-            aria-label="Participant"
-            className="incident-input"
-            value={filters.participant}
-            onChange={(e) => change({ ...filters, participant: e.target.value })}
-          >
-            <option value="">Any participant</option>
-            {users
-              .filter((u) => u.status === 'active')
-              .map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          Created from (UTC)
-          <input
-            className="incident-input"
-            type="date"
-            value={filters.from}
-            onChange={(e) => change({ ...filters, from: e.target.value })}
-          />
-        </label>
-        <label className="space-y-1">
-          Created through (UTC)
-          <input
-            className="incident-input"
-            type="date"
-            value={filters.to}
-            onChange={(e) => change({ ...filters, to: e.target.value })}
-          />
-        </label>
-        <label className="space-y-1">
-          Sort
-          <select
-            aria-label="Sort"
-            className="incident-input"
-            value={filters.sort}
-            onChange={(e) =>
-              change({ ...filters, sort: e.target.value as IncidentFilters['sort'] })
-            }
-          >
-            <option value="updated">Last updated</option>
-            <option value="newest">Newest created</option>
-            <option value="severity">Severity</option>
-          </select>
-        </label>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex min-h-11 items-center gap-2">
-          <input
-            type="checkbox"
-            checked={filters.assignedToMe}
-            onChange={(e) => change({ ...filters, assignedToMe: e.target.checked })}
-          />
-          Assigned to me
-        </label>
-        <button
-          className="incident-button"
-          onClick={() => change({ ...emptyFilters, sort: filters.sort })}
-        >
-          Clear filters
-        </button>
-      </div>
-    </section>
-  );
-}
 const resolver =
   (users: WorkspaceUser[]): Resolver<CreateIncidentInput> =>
   (values) => {
@@ -312,6 +181,7 @@ export function CreateIncidentDialog({
     const previouslyFocused = document.activeElement;
     const element = dialog.current!;
     element.showModal();
+    element.querySelector<HTMLInputElement>('[name="title"]')?.focus();
     return () => {
       element.close();
       if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected)
@@ -335,26 +205,43 @@ export function CreateIncidentDialog({
     <dialog
       ref={dialog}
       aria-labelledby="create-incident-heading"
-      className="incident-dialog"
+      className="creation-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab') return;
+        const controls = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            'button, input, select, textarea, [tabindex="0"]',
+          ),
+        ).filter((element) => !element.matches(':disabled') && element.getClientRects().length > 0);
+        const first = controls[0];
+        const last = controls.at(-1);
+        if (
+          !first ||
+          (event.shiftKey && document.activeElement === first) ||
+          (!event.shiftKey && document.activeElement === last)
+        ) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+        }
+      }}
       onCancel={(event) => {
         event.preventDefault();
         cancel();
       }}
     >
-      <div className="flex items-center justify-between gap-4">
-        <h2 id="create-incident-heading" className="text-2xl font-semibold">
+      <div className="creation-header">
+        <h2 id="create-incident-heading" className="text-section font-semibold">
           Create Incident
         </h2>
-        <button
-          className="incident-button"
+        <IconButton
+          label="Close Create Incident"
           disabled={isSubmitting || sending}
           onClick={cancel}
-          aria-label="Close Create Incident"
         >
-          Close
-        </button>
+          <X size={20} aria-hidden="true" />
+        </IconButton>
       </div>
-      <p className="my-4 text-sm text-muted">
+      <p className="creation-intro">
         You will be commander and a participant. Status starts as Triggered.
       </p>
       <form
@@ -386,108 +273,129 @@ export function CreateIncidentDialog({
           if (ambiguous) void send(ambiguous);
           else void handleSubmit(send)(event);
         }}
-        className="space-y-4"
+        className="creation-form"
+        aria-busy={isSubmitting || sending}
       >
-        <fieldset disabled={isSubmitting || sending || !!ambiguous} className="min-w-0 space-y-4">
-          <label className="block">
-            Title (required)
-            <input
-              className="incident-input"
-              {...register('title')}
-              aria-invalid={!!errors.title}
-              aria-describedby={errors.title ? 'create-title-error' : undefined}
-            />
-          </label>
-          {errors.title && (
-            <p role="alert" id="create-title-error">
-              {errors.title.message}
-            </p>
-          )}
-          <label className="block">
-            Description
-            <textarea
-              className="incident-input min-h-24"
-              {...register('description')}
-              aria-invalid={!!errors.description}
-              aria-describedby={errors.description ? 'create-description-error' : undefined}
-            />
-          </label>
-          {errors.description && (
-            <p role="alert" id="create-description-error">
-              {errors.description.message}
-            </p>
-          )}
-          <label className="block">
-            Severity (required)
-            <select
-              className="incident-input"
-              {...register('severity')}
-              aria-invalid={!!errors.severity}
-              aria-describedby={errors.severity ? 'create-severity-error' : undefined}
+        <div className="creation-body">
+          <fieldset disabled={isSubmitting || sending || !!ambiguous} className="creation-fields">
+            <label className="discovery-field">
+              Title (required)
+              <input
+                className="creation-input"
+                {...register('title')}
+                aria-invalid={!!errors.title}
+                aria-describedby={errors.title ? 'create-title-error' : undefined}
+              />
+            </label>
+            {errors.title && (
+              <p className="creation-field-error" role="alert" id="create-title-error">
+                {errors.title.message}
+              </p>
+            )}
+            <label className="discovery-field">
+              <span>
+                Description <span className="creation-optional">Optional</span>
+              </span>
+              <textarea
+                aria-label="Description"
+                className="creation-input creation-description"
+                {...register('description')}
+                aria-invalid={!!errors.description}
+                aria-describedby={errors.description ? 'create-description-error' : undefined}
+              />
+            </label>
+            {errors.description && (
+              <p className="creation-field-error" role="alert" id="create-description-error">
+                {errors.description.message}
+              </p>
+            )}
+            <label className="discovery-field">
+              Severity (required)
+              <select
+                className="creation-input"
+                {...register('severity')}
+                aria-invalid={!!errors.severity}
+                aria-describedby={errors.severity ? 'create-severity-error' : undefined}
+              >
+                <option value="">Choose severity</option>
+                {severities.map((s) => (
+                  <option key={s} value={s}>
+                    {s} · {severityLabels[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {errors.severity && (
+              <p className="creation-field-error" role="alert" id="create-severity-error">
+                {errors.severity.message}
+              </p>
+            )}
+            <fieldset
+              aria-invalid={!!errors.serviceIds}
+              aria-describedby={errors.serviceIds ? 'create-services-error' : undefined}
             >
-              <option value="">Choose severity</option>
-              {severities.map((s) => (
-                <option key={s} value={s}>
-                  {s} · {severityLabels[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-          {errors.severity && (
-            <p role="alert" id="create-severity-error">
-              {errors.severity.message}
-            </p>
+              <legend>
+                Affected services <span className="creation-optional">Optional</span>
+              </legend>
+              <div className="creation-options">
+                {services.map((s) => (
+                  <label className="creation-option" key={s.id}>
+                    <input type="checkbox" value={s.id} {...register('serviceIds')} />
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+              {errors.serviceIds && (
+                <p className="creation-field-error" id="create-services-error" role="alert">
+                  {errors.serviceIds.message}
+                </p>
+              )}
+            </fieldset>
+            <fieldset
+              aria-invalid={!!errors.participantIds}
+              aria-describedby={errors.participantIds ? 'create-participants-error' : undefined}
+            >
+              <legend>
+                Additional participants <span className="creation-optional">Optional</span>
+              </legend>
+              <div className="creation-options">
+                {users
+                  .filter((u) => u.status === 'active' && u.id !== creatorId)
+                  .map((u) => (
+                    <label className="creation-option" key={u.id}>
+                      <input type="checkbox" value={u.id} {...register('participantIds')} />
+                      {u.name}
+                    </label>
+                  ))}
+              </div>
+              {errors.participantIds && (
+                <p className="creation-field-error" id="create-participants-error" role="alert">
+                  {errors.participantIds.message}
+                </p>
+              )}
+            </fieldset>
+          </fieldset>
+          {failure && (
+            <InlineAlert>
+              <p ref={error} tabIndex={-1}>
+                {failure}
+                {ambiguous &&
+                  ' Fields are locked until this submission is confirmed; retry safely using the same submission.'}
+              </p>
+            </InlineAlert>
           )}
-          <fieldset>
-            <legend className="font-semibold">Affected services</legend>
-            {services.map((s) => (
-              <label className="flex min-h-11 items-center gap-2" key={s.id}>
-                <input type="checkbox" value={s.id} {...register('serviceIds')} />
-                {s.label}
-              </label>
-            ))}
-            {errors.serviceIds && <p role="alert">{errors.serviceIds.message}</p>}
-          </fieldset>
-          <fieldset>
-            <legend className="font-semibold">Additional participants</legend>
-            {users
-              .filter((u) => u.status === 'active' && u.id !== creatorId)
-              .map((u) => (
-                <label className="flex min-h-11 items-center gap-2" key={u.id}>
-                  <input type="checkbox" value={u.id} {...register('participantIds')} />
-                  {u.name}
-                </label>
-              ))}
-            {errors.participantIds && <p role="alert">{errors.participantIds.message}</p>}
-          </fieldset>
-        </fieldset>
-        {failure && (
-          <p ref={error} tabIndex={-1} role="alert">
-            {failure}
-            {ambiguous &&
-              ' Fields are locked until this submission is confirmed; retry safely using the same submission.'}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-3">
-          <button
-            className="incident-button incident-primary"
-            disabled={isSubmitting || sending}
-            type="submit"
-          >
+        </div>
+        <div className="creation-footer">
+          <Button type="button" variant="quiet" disabled={isSubmitting || sending} onClick={cancel}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={isSubmitting || sending} type="submit">
             {isSubmitting || sending
               ? 'Creating…'
               : ambiguous
                 ? 'Retry submission'
                 : 'Create Incident'}
-          </button>
-          <button
-            type="button"
-            className="incident-button"
-            disabled={isSubmitting || sending}
-            onClick={cancel}
-          >
-            Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </dialog>

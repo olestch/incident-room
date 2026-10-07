@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './_shell/shell.css';
+@import '../features/incident-management/discovery.css';
 
 .command-dialog {
   margin: auto;

@@ -1,5 +1,8 @@
 'use client';
 import Link from 'next/link';
+import { Plus, ListFilter } from 'lucide-react';
+import { Button, InlineAlert } from '@/shared/ui/primitives';
+import { IncidentQueueRow, IncidentQueueSkeleton } from '@/features/incident-management/queue-row';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -256,38 +259,48 @@ function IdentityIncidentPage({
         </div>
       </section>
     );
+  const listErrorView = (error: Error, retry: () => void) => (
+    <div className="queue-error">
+      <InlineAlert>
+        <p>
+          {error instanceof AppError && error.category === 'authorization'
+            ? 'Access denied.'
+            : 'Unable to load incident data.'}
+        </p>
+        {!(
+          error instanceof AppError && ['not-found', 'authorization'].includes(error.category)
+        ) && <Button onClick={retry}>Retry</Button>}
+      </InlineAlert>
+    </div>
+  );
   const rows = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total;
   return (
     <section aria-label="Incident list">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="discovery-header">
         <div>
-          <h1 className="text-3xl font-semibold">Incidents</h1>
-          <p className="mt-2 text-muted">Fictional workspace · Coordinate service incidents</p>
+          <h1 className="text-page font-semibold">Incidents</h1>
+          <p className="discovery-description">Track service impact and coordinate a response.</p>
         </div>
         {current.data && canCreateIncident(current.data, workspaceId) && (
-          <button
-            className="incident-button incident-primary"
-            disabled={!users.data}
-            onClick={() => setCreating(true)}
-          >
-            Create Incident
-          </button>
+          <Button variant="primary" disabled={!users.data} onClick={() => setCreating(true)}>
+            <Plus size={17} aria-hidden="true" /> Create Incident
+          </Button>
         )}
       </div>
       <IncidentFiltersView filters={filters} users={users.data ?? []} change={changeFilters} />
       {(users.isPending || (!!users.data && list.isPending && !list.isError)) && (
-        <p role="status">Loading incidents…</p>
+        <IncidentQueueSkeleton />
       )}
-      {users.isError && errorView(users.error, () => void users.refetch())}
+      {users.isError && listErrorView(users.error, () => void users.refetch())}
       {list.isError &&
-        errorView(
+        listErrorView(
           list.error,
           () => void (list.isFetchNextPageError ? list.fetchNextPage() : list.refetch()),
         )}
       {list.data && !inaccessible(list.error) && !inaccessible(users.error) && (
         <>
-          <p role="status" className="mb-4 text-sm text-muted">
+          <p role="status" className="queue-count">
             {list.isFetchingNextPage
               ? 'Loading more incidents…'
               : list.isFetching
@@ -295,37 +308,38 @@ function IdentityIncidentPage({
                 : `${rows.length} of ${total} incidents`}
           </p>
           {rows.length === 0 && (
-            <div className="py-8">
-              <h2 className="text-xl font-semibold">
+            <div className="queue-empty">
+              <ListFilter size={24} aria-hidden="true" />
+              <h2 className="text-section font-semibold">
                 {list.data.pages[0]?.workspaceTotal === 0
                   ? 'No incidents yet'
                   : 'No incidents match your filters'}
               </h2>
+              <p>
+                {list.data.pages[0]?.workspaceTotal === 0
+                  ? 'Create an incident to start coordinating a response.'
+                  : 'Try removing a filter or widening the created date range.'}
+              </p>
               {list.data.pages[0]?.workspaceTotal !== 0 && (
-                <button
-                  className="incident-button mt-3"
-                  onClick={() => changeFilters(emptyFilters)}
-                >
-                  Clear filters
-                </button>
+                <Button onClick={() => changeFilters({ ...emptyFilters, sort: filters.sort })}>
+                  Clear filters and show incidents
+                </Button>
               )}
             </div>
           )}
-          <ul className="space-y-4" aria-label="Incidents">
+          <ul className="incident-queue" aria-label="Incidents">
             {rows.map((incident) => (
-              <li key={incident.id} className="rounded-lg border border-line p-4">
-                <IncidentContext incident={incident} users={users.data ?? []} />
-              </li>
+              <IncidentQueueRow key={incident.id} incident={incident} users={users.data ?? []} />
             ))}
           </ul>
           {list.hasNextPage && (
-            <button
-              className="incident-button mt-5"
+            <Button
+              className="queue-load-more"
               disabled={list.isFetching}
               onClick={() => void list.fetchNextPage()}
             >
               Load more
-            </button>
+            </Button>
           )}
         </>
       )}

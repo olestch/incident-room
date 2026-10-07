@@ -66,7 +66,7 @@ test('protected redirect, login, reload, logout and identity switch stay isolate
   await expect(page.getByLabel('Current user')).not.toContainText('River Vale');
   // Workspace incident commanders remain readable; only identity-owned profile changes.
   await navigateApp(page, 'My Incidents');
-  await expect(page.getByLabel('Assigned to me')).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
   expect(browserErrors).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

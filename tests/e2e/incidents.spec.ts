@@ -8,6 +8,52 @@ async function login(page: Page, email = 'river.vale@example.test') {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Incidents', exact: true })).toBeVisible();
 }
+async function openFilter(page: Page, name: string) {
+  await expect(page.getByLabel('Incident filters', { exact: true })).toBeVisible();
+  const mobile = page.getByRole('button', { name: /^Filters/ });
+  if ((await mobile.isVisible()) && (await mobile.getAttribute('aria-expanded')) === 'false')
+    await mobile.click();
+  await page.getByRole('button', { name: new RegExp(`^${name} filter`) }).click();
+}
+
+test('filter popovers support multiple values, Escape, chips and URL history', async ({ page }) => {
+  await login(page);
+  await page.goto('/app/incidents?tracking=keep');
+  await openFilter(page, 'Status');
+  await expect(page.getByLabel('Triggered', { exact: true })).toBeFocused();
+  await page.getByLabel('Investigating', { exact: true }).click();
+  await expect(page.getByLabel('Investigating', { exact: true })).toBeChecked();
+  await expect(page).toHaveURL(/status=investigating/);
+  await page.getByLabel('Monitoring', { exact: true }).click();
+  await expect(page.getByLabel('Monitoring', { exact: true })).toBeChecked();
+  await expect(page).toHaveURL(/status=investigating%2Cmonitoring/);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: /^Status filter/ })).toBeFocused();
+  await openFilter(page, 'Severity');
+  await page.getByLabel('P1 · Critical', { exact: true }).click();
+  await expect(page.getByLabel('P1 · Critical', { exact: true })).toBeChecked();
+  await expect(page).toHaveURL(/severity=P1/);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Remove Status: Investigating' }).click();
+  await expect(page).toHaveURL(/status=monitoring/);
+  await expect(page).toHaveURL(/severity=P1/);
+  await expect(page).toHaveURL(/tracking=keep/);
+  await page.goBack();
+  await expect(page.getByRole('button', { name: 'Remove Status: Investigating' })).toBeVisible();
+  await page.goForward();
+  await expect(page.getByRole('button', { name: 'Remove Status: Investigating' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+  await expect(page).toHaveURL('/app/incidents?tracking=keep');
+  const row = page
+    .getByRole('list', { name: 'Incidents', exact: true })
+    .getByRole('listitem')
+    .first();
+  const link = row.getByRole('link');
+  await expect(link).toHaveAttribute('href', /\/app\/incidents\/INC-\d+/);
+  await row.click();
+  await expect(page.getByLabel('Incident detail')).toBeVisible();
+});
+
 test('filters, URL reload/history, cursor pagination and clear filters', async ({ page }) => {
   await login(page);
   await expect(
@@ -17,21 +63,23 @@ test('filters, URL reload/history, cursor pagination and clear filters', async (
   await expect(
     page.getByRole('list', { name: 'Incidents', exact: true }).getByRole('listitem'),
   ).toHaveCount(24);
+  await openFilter(page, 'Severity');
   await page.getByLabel('P1 · Critical', { exact: true }).click();
   await expect(page.getByLabel('P1 · Critical', { exact: true })).toBeChecked();
   await expect(page).toHaveURL(/severity=P1/);
+  await openFilter(page, 'Status');
   await page.getByLabel('Investigating', { exact: true }).click();
   await expect(page.getByLabel('Investigating', { exact: true })).toBeChecked();
   await expect(page).toHaveURL(/status=investigating/);
   const list = page.getByRole('list', { name: 'Incidents', exact: true });
   await expect(list.getByRole('listitem')).toHaveCount(1);
   for (const row of await list.getByRole('listitem').all()) {
-    await expect(row).toContainText('P1 · Critical');
+    await expect(row).toContainText('P1 Critical');
     await expect(row).toContainText('Investigating');
   }
   await page.reload();
   await expect(page.getByLabel('P1 · Critical')).toBeChecked();
-  await expect(page.getByLabel('Investigating')).toBeChecked();
+  await expect(page.getByLabel('Investigating', { exact: true })).toBeChecked();
   await page.getByLabel('Sort', { exact: true }).selectOption('newest');
   await expect(page).toHaveURL(/sort=newest/);
   await page.goBack();
@@ -40,7 +88,7 @@ test('filters, URL reload/history, cursor pagination and clear filters', async (
   await expect(page.getByLabel('Sort', { exact: true })).toHaveValue('newest');
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
   await expect(page.getByLabel('P1 · Critical')).not.toBeChecked();
-  await expect(page.getByLabel('Investigating')).not.toBeChecked();
+  await expect(page.getByLabel('Investigating', { exact: true })).not.toBeChecked();
   await expect(list.getByRole('listitem')).toHaveCount(12);
   await page.goto(
     '/app/incidents?status=invalid,monitoring&severity=P4,bad&participant=unknown&from=2026-02-30&tracking=keep',
@@ -58,15 +106,18 @@ test('My Incidents uses current stable identity; dates and participant apply to 
   await login(page, 'sage.linden@example.test');
   await navigateApp(page, 'My Incidents');
   await expect(page).toHaveURL('/app/incidents?assignedToMe=true');
-  await expect(page.getByLabel('Assigned to me')).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
   for (const row of await page
     .getByRole('list', { name: 'Incidents', exact: true })
     .getByRole('listitem')
     .all())
     await expect(row).toContainText(/Participants.*Sage Linden/);
+  await openFilter(page, 'Participant');
   await page.getByLabel('Participant', { exact: true }).selectOption('demo-river');
+  await openFilter(page, 'Created date');
   await page.getByLabel('Created from (UTC)').fill('2026-09-01');
   await page.getByLabel('Created through (UTC)').fill('2026-09-01');
+  await page.keyboard.press('Escape');
   await expect(
     page.getByRole('list', { name: 'Incidents', exact: true }).getByRole('listitem'),
   ).toHaveCount(1);
@@ -83,6 +134,11 @@ test('create validates, preserves state on resize, navigates to real detail and 
   await page.getByRole('button', { name: 'Create Incident', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Create Incident', exact: true });
   await expect(dialog).toBeVisible();
+  await expect(page.getByLabel('Title (required)')).toBeFocused();
+  await dialog.getByRole('button', { name: 'Create Incident', exact: true }).press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Close Create Incident' })).toBeFocused();
+  await dialog.getByRole('button', { name: 'Close Create Incident' }).press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Create Incident', exact: true })).toBeFocused();
   await dialog.getByRole('button', { name: 'Create Incident', exact: true }).click();
   await expect(page.getByText('Enter a title.', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Title (required)')).toBeFocused();

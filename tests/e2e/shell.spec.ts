@@ -48,7 +48,7 @@ test('shell is responsive at all acceptance widths with truthful navigation and 
   }
   await navigateApp(page, 'My Incidents');
   await expect(page).toHaveURL('/app/incidents?assignedToMe=true');
-  await expect(page.getByLabel('Assigned to me')).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
 });
 
 test('user popover supports keyboard, Escape restoration, light dismissal and real profile navigation', async ({

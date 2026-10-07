@@ -364,7 +364,8 @@ it('distinguishes filtered empty, genuinely empty and error; retry preserves URL
   expect(
     await screen.findByRole('heading', { name: 'No incidents match your filters' }),
   ).toBeVisible();
-  expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2);
+  expect(screen.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Clear filters and show incidents' })).toBeVisible();
 });
 it('represents an empty authority, not a network failure', async () => {
   server.use(

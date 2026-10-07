@@ -104,6 +104,27 @@ it('validates required fields, associates errors and submits only normalized val
   });
   expect(submit.mock.calls[0]?.[1]).toMatch(/^[\da-f-]{36}$/);
 });
+it('removes one chip without changing other filters or the sort order', async () => {
+  const change = vi.fn();
+  const filters = {
+    ...emptyFilters,
+    status: ['investigating' as const, 'monitoring' as const],
+    severity: ['P1' as const],
+    participant: 'demo-sage',
+    from: '2026-09-01',
+    assignedToMe: true,
+    sort: 'newest' as const,
+  };
+  render(<IncidentFiltersView filters={filters} users={users} change={change} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Remove Status: Investigating' }));
+  expect(change).toHaveBeenLastCalledWith({ ...filters, status: ['monitoring'] });
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Remove Created from: 2026-09-01 UTC' }),
+  );
+  expect(change).toHaveBeenLastCalledWith({ ...filters, from: '' });
+  await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  expect(change).toHaveBeenLastCalledWith({ ...emptyFilters, sort: 'newest' });
+});
 it('preserves values on known failure and retries without duplicate automatic submissions', async () => {
   const submit = vi
     .fn()
