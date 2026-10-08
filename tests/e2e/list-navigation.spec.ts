@@ -52,7 +52,10 @@ test('row metadata opens a native link in a new tab; keyboard enters the same ro
   await expect(row.locator('button, input, select')).toHaveCount(0);
   const box = (await row.boundingBox())!;
   const opened = context.waitForEvent('page');
-  await row.click({ button: 'middle', position: { x: box.width - 12, y: box.height - 12 } });
+  await row.click({
+    modifiers: ['ControlOrMeta'],
+    position: { x: box.width - 12, y: box.height - 12 },
+  });
   const newTab = await opened;
   await expect(newTab).toHaveURL(destination!);
   await newTab.close();

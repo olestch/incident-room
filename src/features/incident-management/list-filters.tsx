@@ -1,5 +1,13 @@
 'use client';
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import type { WorkspaceUser } from '@/entities/current-user/model';
 import { emptyFilters, type IncidentFilters } from '@/entities/incident/filters';
@@ -104,7 +112,18 @@ export function IncidentFiltersView({
   const toolbar = useRef<HTMLElement>(null);
   const normalHeight = useRef(0);
   const [compact, setCompact] = useState(false);
-  const [reservation, setReservation] = useState(0);
+  const reservation = useRef<HTMLDivElement>(null);
+  const measureReservation = useCallback(() => {
+    const element = toolbar.current;
+    const spacer = reservation.current;
+    if (!element || !spacer) return;
+    const height = element.getBoundingClientRect().height;
+    const isCompact = element.dataset.compact === 'true';
+    if (!isCompact) normalHeight.current = height;
+    // Reserve the full toolbar height before paint so compact transitions do not move rows.
+    spacer.style.height = `${isCompact ? Math.max(0, normalHeight.current - height) : 0}px`;
+  }, []);
+  useLayoutEffect(measureReservation);
   useEffect(() => {
     if (!origin.current || typeof IntersectionObserver === 'undefined') return;
     const header = document.querySelector('.shell-topbar');
@@ -112,6 +131,8 @@ export function IncidentFiltersView({
       ([entry]) => {
         if (!entry) return;
         const stuck = entry.boundingClientRect.top < (header?.getBoundingClientRect().height ?? 56);
+        if (stuck && toolbar.current?.dataset.compact !== 'true')
+          normalHeight.current = toolbar.current?.getBoundingClientRect().height ?? 0;
         // Keep the focused filter (including an open native popover) available on transition.
         if (
           stuck &&
@@ -128,16 +149,10 @@ export function IncidentFiltersView({
   useEffect(() => {
     const element = toolbar.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => {
-      const height = element.getBoundingClientRect().height;
-      const isCompact = element.dataset.compact === 'true';
-      if (!isCompact) normalHeight.current = height;
-      // Replacing full controls with the compact bar must not shift the list below it.
-      setReservation(isCompact ? Math.max(0, normalHeight.current - height) : 0);
-    });
+    const observer = new ResizeObserver(measureReservation);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [measureReservation]);
   const chips: { key: string; label: string; remove: () => void }[] = [
     ...filters.status.map((value) => ({
       key: `status-${value}`,
@@ -358,7 +373,7 @@ export function IncidentFiltersView({
           </label>
         </div>
       </section>
-      <div aria-hidden="true" style={{ height: reservation }} />
+      <div ref={reservation} aria-hidden="true" />
     </>
   );
 }
