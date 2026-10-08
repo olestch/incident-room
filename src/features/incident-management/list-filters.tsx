@@ -121,7 +121,7 @@ export function IncidentFiltersView({
     const isCompact = element.dataset.compact === 'true';
     if (!isCompact) normalHeight.current = height;
     // Reserve the full toolbar height before paint so compact transitions do not move rows.
-    spacer.style.height = `${isCompact ? Math.max(0, normalHeight.current - height) : 0}px`;
+    spacer.style.height = `${isCompact && !window.matchMedia('(max-width: 47.99rem)').matches ? Math.max(0, normalHeight.current - height) : 0}px`;
   }, []);
   useLayoutEffect(measureReservation);
   useEffect(() => {
@@ -212,7 +212,11 @@ export function IncidentFiltersView({
         data-compact={compact}
         data-expanded={expanded}
         onBlurCapture={(event) => {
-          if (compact && !event.currentTarget.contains(event.relatedTarget)) setExpanded(false);
+          if (
+            (compact || window.matchMedia('(max-width: 47.99rem)').matches) &&
+            !event.currentTarget.contains(event.relatedTarget)
+          )
+            setExpanded(false);
         }}
       >
         <div className="filter-toolbar">
@@ -232,99 +236,6 @@ export function IncidentFiltersView({
               if (event.target.closest('.filter-popover')) setExpanded(true);
             }}
           >
-            <div className="filter-dimensions" id={panelId}>
-              <FilterPopover label="Status" count={filters.status.length}>
-                <fieldset>
-                  <legend className="sr-only">Status</legend>
-                  {statuses.map((value) => (
-                    <label className="filter-option" key={value}>
-                      <input
-                        type="checkbox"
-                        aria-label={statusLabels[value]}
-                        checked={filters.status.includes(value)}
-                        onChange={(event) =>
-                          change({
-                            ...filters,
-                            status: event.target.checked
-                              ? [...filters.status, value]
-                              : filters.status.filter((item) => item !== value),
-                          })
-                        }
-                      />
-                      <span aria-hidden="true">
-                        <LifecycleBadge status={value} />
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-              </FilterPopover>
-              <FilterPopover label="Severity" count={filters.severity.length}>
-                <fieldset>
-                  <legend className="sr-only">Severity</legend>
-                  {severities.map((value) => (
-                    <label className="filter-option" key={value}>
-                      <input
-                        type="checkbox"
-                        aria-label={`${value} · ${severityLabels[value]}`}
-                        checked={filters.severity.includes(value)}
-                        onChange={(event) =>
-                          change({
-                            ...filters,
-                            severity: event.target.checked
-                              ? [...filters.severity, value]
-                              : filters.severity.filter((item) => item !== value),
-                          })
-                        }
-                      />
-                      <span aria-hidden="true">
-                        <SeverityBadge severity={value} />
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-              </FilterPopover>
-              <FilterPopover label="Participant" count={filters.participant ? 1 : 0}>
-                <label className="discovery-field">
-                  Participant
-                  <select
-                    aria-label="Participant"
-                    value={filters.participant}
-                    onChange={(event) => change({ ...filters, participant: event.target.value })}
-                  >
-                    <option value="">Any participant</option>
-                    {users
-                      .filter((user) => user.status === 'active')
-                      .map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              </FilterPopover>
-              <FilterPopover
-                label="Created date"
-                count={Number(!!filters.from) + Number(!!filters.to)}
-              >
-                <label className="discovery-field">
-                  Created from (UTC)
-                  <input
-                    type="date"
-                    value={filters.from}
-                    onChange={(event) => change({ ...filters, from: event.target.value })}
-                  />
-                </label>
-                <label className="discovery-field">
-                  Created through (UTC)
-                  <input
-                    type="date"
-                    value={filters.to}
-                    onChange={(event) => change({ ...filters, to: event.target.value })}
-                  />
-                </label>
-                <p className="filter-help">Includes both dates, in UTC.</p>
-              </FilterPopover>
-            </div>
             <label className="filter-assigned">
               <input
                 type="checkbox"
@@ -333,29 +244,124 @@ export function IncidentFiltersView({
               />
               Assigned to me
             </label>
-            {chips.length > 0 && (
-              <div className="filter-chips" aria-label="Active filters">
-                {chips.map((chip) => (
-                  <Button
-                    key={chip.key}
-                    variant="quiet"
-                    className="filter-chip"
-                    aria-label={`Remove ${chip.label}`}
-                    onClick={chip.remove}
-                  >
-                    {chip.label}
-                    <X size={13} aria-hidden="true" />
-                  </Button>
-                ))}
-                <Button
-                  variant="quiet"
-                  className="filter-clear"
-                  onClick={() => change({ ...emptyFilters, sort: filters.sort })}
+            <div className="filter-options">
+              <div className="filter-dimensions" id={panelId}>
+                <FilterPopover label="Status" count={filters.status.length}>
+                  <fieldset>
+                    <legend className="sr-only">Status</legend>
+                    {statuses.map((value) => (
+                      <label className="filter-option" key={value}>
+                        <input
+                          type="checkbox"
+                          aria-label={statusLabels[value]}
+                          checked={filters.status.includes(value)}
+                          onChange={(event) =>
+                            change({
+                              ...filters,
+                              status: event.target.checked
+                                ? [...filters.status, value]
+                                : filters.status.filter((item) => item !== value),
+                            })
+                          }
+                        />
+                        <span aria-hidden="true">
+                          <LifecycleBadge status={value} />
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                </FilterPopover>
+                <FilterPopover label="Severity" count={filters.severity.length}>
+                  <fieldset>
+                    <legend className="sr-only">Severity</legend>
+                    {severities.map((value) => (
+                      <label className="filter-option" key={value}>
+                        <input
+                          type="checkbox"
+                          aria-label={`${value} · ${severityLabels[value]}`}
+                          checked={filters.severity.includes(value)}
+                          onChange={(event) =>
+                            change({
+                              ...filters,
+                              severity: event.target.checked
+                                ? [...filters.severity, value]
+                                : filters.severity.filter((item) => item !== value),
+                            })
+                          }
+                        />
+                        <span aria-hidden="true">
+                          <SeverityBadge severity={value} />
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                </FilterPopover>
+                <FilterPopover label="Participant" count={filters.participant ? 1 : 0}>
+                  <label className="discovery-field">
+                    Participant
+                    <select
+                      aria-label="Participant"
+                      value={filters.participant}
+                      onChange={(event) => change({ ...filters, participant: event.target.value })}
+                    >
+                      <option value="">Any participant</option>
+                      {users
+                        .filter((user) => user.status === 'active')
+                        .map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </FilterPopover>
+                <FilterPopover
+                  label="Created date"
+                  count={Number(!!filters.from) + Number(!!filters.to)}
                 >
-                  Clear filters
-                </Button>
+                  <label className="discovery-field">
+                    Created from (UTC)
+                    <input
+                      type="date"
+                      value={filters.from}
+                      onChange={(event) => change({ ...filters, from: event.target.value })}
+                    />
+                  </label>
+                  <label className="discovery-field">
+                    Created through (UTC)
+                    <input
+                      type="date"
+                      value={filters.to}
+                      onChange={(event) => change({ ...filters, to: event.target.value })}
+                    />
+                  </label>
+                  <p className="filter-help">Includes both dates, in UTC.</p>
+                </FilterPopover>
               </div>
-            )}
+              {chips.length > 0 && (
+                <div className="filter-chips" aria-label="Active filters">
+                  {chips.map((chip) => (
+                    <Button
+                      key={chip.key}
+                      variant="quiet"
+                      className="filter-chip"
+                      aria-label={`Remove ${chip.label}`}
+                      onClick={chip.remove}
+                    >
+                      {chip.label}
+                      <X size={13} aria-hidden="true" />
+                    </Button>
+                  ))}
+                  <Button
+                    variant="quiet"
+                    className="filter-clear"
+                    onClick={() => change({ ...emptyFilters, sort: filters.sort })}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           <label className="filter-sort">
             <span>Sort</span>

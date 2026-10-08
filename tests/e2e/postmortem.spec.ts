@@ -11,6 +11,8 @@ async function login(page: Page, email = 'river.vale@example.test') {
 async function initiate(page: Page, incident = number) {
   await login(page);
   await page.goto(`/app/incidents/${incident}`);
+  if (await page.evaluate(() => matchMedia('(max-width: 63.99rem)').matches))
+    await page.getByRole('button', { name: 'Incident context', exact: true }).click();
   await page.getByRole('link', { name: 'Create Postmortem', exact: true }).click();
   await expect(page.getByText('Postmortem has not been initiated.')).toBeVisible();
   await page.getByRole('button', { name: 'Initiate Postmortem', exact: true }).click();

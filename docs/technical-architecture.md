@@ -447,6 +447,18 @@ Rows retain their semantic stretched Next Link, native new-tab behavior and row 
 
 The Phase 2 request explicitly supersedes the specification's redundant My Incidents primary-navigation entry without editing the accepted Product Specification. Assigned to me stays in filters and a palette shortcut. The legacy `/app/my-incidents` server route redirects to the fixed `/app/incidents` destination with assignment forced on; it preserves repeated/unknown query values as encoded data and drops the obsolete page cursor. The existing session gate still preserves anonymous return destinations. Timeline's existing callbacks now use compact secondary buttons labelled Load earlier events and Jump to latest; Room scrolling, virtualization and composer ownership remain unchanged.
 
+## 49. UX remediation Phase 2.1: mobile workspace presentation
+
+Below 48rem the Incident List keeps its heading and Create on one row, the description immediately below, then one stable two-row filter toolbar. Assigned to me remains visible alongside the active-count Filters trigger and Sort. Expanded dimensions/chips overlay the list in a bounded scrolling panel; the same controls and URL codec remain authoritative. Mobile compact transitions have identical heights and a zero reservation; desktop retains the measured reservation. This removes the mobile blank gap without moving rows or remounting focused controls.
+
+Below 64rem Room has Back to list and Incident context, with its existing incident heading retained for assistive navigation. One context content component renders from the confirmed incident/users props in either the desktop rail/disclosure or a mobile sheet. Only presentation state moves; Timeline, Thread, drafts, delivery, Query resources and virtualizers remain mounted and unchanged.
+
+The sheet extends the existing native-dialog Drawer. `showModal()` supplies top-layer modality and background inertness; existing controlled Escape/backdrop dismissal, Tab wrapping and opener restoration are reused. Its body scrolls independently and is keyboard reachable; safe-area padding, bounded visual-viewport height/bottom position, a top gap and rounded corners use existing tokens. Sheet-specific body overflow locking prevents page scroll. Breakpoint migration dismisses the sheet and transfers focus into the available context surface. A URL-owned Thread clears the local sheet before its modal presentation commits, including browser Forward navigation. There is no opening/closing/drag animation, including with reduced motion.
+
+Gesture evaluation considered the existing Drawer, native dialog/Pointer Events, and the public Vaul drawer (MIT; its maintainer currently declares it unmaintained). No dependency is added: a handle-only Pointer Events gesture uses capture and releases it on completion, rejects horizontal/upward intent, and clears cancelled/lost-capture gestures. Only a completed, predominantly downward movement of at least 64 CSS px dismisses. The sheet body never claims a drag gesture, so long-content scrolling remains native. Close/Escape/backdrop are equivalent accessible alternatives. Unit tests cover aborted/short/orthogonal gestures; browser tests dispatch genuine touch input for content scrolling, cancellation and downward dismissal.
+
+Room sizes its main area from visual-viewport height minus the measured shell area above it, responding to viewport resize/panning, window resize and header measurements, with `100dvh` fallback. A size container uses the actual remaining workspace height to apply the already accepted short-room presentation when a software keyboard shrinks the visual viewport without changing CSS height media queries. Composer growth/send/draft/mention behavior and TanStack variable-height anchoring are unchanged. Browser checks exercise 320/375/390/430/768/1024/1280 widths, short heights, modal focus/locking, breakpoint/Thread migration, old targets, history prepend, 10k/50k bounded DOM, and emulated visual-viewport keyboard changes. Physical-device IME/keyboard and assistive-technology certification remain outside automated Chromium coverage.
+
 ## Public implementation references
 
 - [Next.js installation and current App Router tooling](https://nextjs.org/docs/app/getting-started/installation)
@@ -457,3 +469,6 @@ The Phase 2 request explicitly supersedes the specification's redundant My Incid
 - [MSW browser integration](https://mswjs.io/guides/integrations/browser)
 - [Service Worker global lifecycle and nonpersistent state](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope)
 - [Service Worker message events](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/message_event)
+- [Native dialog modality and accessibility](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/dialog)
+- [Pointer capture for bounded gesture ownership](https://developer.mozilla.org/en-US/docs/Web/API/Element/setPointerCapture)
+- [Vaul dependency/maintenance evaluation](https://github.com/emilkowalski/vaul)

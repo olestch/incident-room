@@ -89,3 +89,38 @@ it('only a backdrop click, not a content click, asks the owner to close', () => 
   fireEvent.click(dialog, { clientX: 50, clientY: 200 });
   expect(close).toHaveBeenCalledTimes(1);
 });
+
+it('sheet handle dismisses only a completed downward gesture and never a cancelled or horizontal gesture', () => {
+  const close = vi.fn();
+  const { container } = render(
+    <Drawer side="bottom" open close={close} title="Context">
+      Details
+    </Drawer>,
+  );
+  const handle = container.querySelector<HTMLElement>('.ui-sheet-handle')!;
+  handle.setPointerCapture = vi.fn();
+  handle.hasPointerCapture = vi.fn(() => true);
+  handle.releasePointerCapture = vi.fn();
+  const pointer = (type: string, x: number, y: number) => {
+    const event = new Event(type, { bubbles: true });
+    Object.assign(event, { pointerId: 1, isPrimary: true, button: 0, clientX: x, clientY: y });
+    fireEvent(handle, event);
+  };
+  pointer('pointerdown', 100, 100);
+  pointer('pointerup', 100, 140);
+  pointer('pointerdown', 100, 100);
+  pointer('pointermove', 140, 110);
+  pointer('pointerup', 100, 200);
+  pointer('pointerdown', 100, 100);
+  pointer('pointercancel', 100, 200);
+  pointer('pointerup', 100, 200);
+  pointer('pointerdown', 100, 100);
+  pointer('lostpointercapture', 100, 100);
+  pointer('pointerup', 100, 200);
+  expect(close).not.toHaveBeenCalled();
+  pointer('pointerdown', 100, 100);
+  pointer('pointermove', 105, 190);
+  pointer('pointerup', 105, 190);
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(handle.releasePointerCapture).toHaveBeenCalled();
+});

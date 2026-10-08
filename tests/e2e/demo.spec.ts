@@ -75,8 +75,14 @@ test('confirmed 50k dataset uses bounded DOM and reloadable old target', async (
     (r) =>
       r.url().includes('/mock-api/incidents/INC-2841/timeline') && r.request().method() === 'GET',
   );
+  const transport = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/mock-api/incidents/INC-2841/realtime/stream',
+  );
   await page.getByRole('button', { name: 'Replace showcase dataset' }).click();
   expect((await (await dataset).json()).total).toBe(50000);
+  // Initial history and transport readiness complete independently after dataset replacement.
+  expect((await transport).status()).toBe(200);
   await expect(page.getByLabel('Realtime connection', { exact: true })).toHaveText('Connected');
   await expect(page.locator('[data-entry-id]').first()).toBeVisible();
   expect(await page.locator('[data-entry-id]').count()).toBeLessThan(80);
@@ -87,6 +93,29 @@ test('confirmed 50k dataset uses bounded DOM and reloadable old target', async (
   expect(await page.locator('[data-entry-id]').count()).toBeLessThan(80);
   await viewport.press('End');
   await expect(page.locator('[data-entry-id="fictional-incident-2841:evt-50000"]')).toBeVisible();
+  if (await page.getByRole('dialog', { name: 'Demo tools', exact: true }).isVisible())
+    await closeDemo(page);
+  await expect(page.getByRole('dialog', { name: 'Demo tools', exact: true })).not.toBeVisible();
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/app/incidents/INC-2841?event=fictional-incident-2841:evt-42');
+  const target = page.locator('[data-entry-id="fictional-incident-2841:evt-42"]');
+  await expect(target).toBeInViewport();
+  const offset = () =>
+    target.evaluate(
+      (element) =>
+        element.getBoundingClientRect().top -
+        element.closest('.timeline-viewport')!.getBoundingClientRect().top,
+    );
+  const before = await offset();
+  await viewport.evaluate((element) => element.setAttribute('data-mount-check', 'retained'));
+  await page.getByRole('button', { name: 'Incident context', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Incident context', exact: true })
+    .getByRole('button', { name: 'Close Incident context' })
+    .click();
+  await expect(viewport).toHaveAttribute('data-mount-check', 'retained');
+  await expect.poll(async () => Math.abs((await offset()) - before)).toBeLessThanOrEqual(8);
+  expect(await page.locator('[data-entry-id]').count()).toBeLessThan(80);
   await page.goto(
     '/app/incidents/INC-2841?event=fictional-incident-2841:evt-42&thread=fictional-incident-2841:evt-42',
   );

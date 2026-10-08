@@ -16,7 +16,7 @@ export function Drawer({
   close(): void;
   title: string;
   children: ReactNode;
-  side?: 'left' | 'right';
+  side?: 'left' | 'right' | 'bottom';
   description?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -82,6 +82,7 @@ export function Drawer({
           close();
       }}
     >
+      {side === 'bottom' && <SwipeHandle close={close} />}
       <header className="ui-drawer-header">
         <h2 id={heading} className="type-section">
           {title}
@@ -90,7 +91,12 @@ export function Drawer({
           <X size={20} aria-hidden="true" />
         </IconButton>
       </header>
-      <div className="ui-drawer-body">
+      <div
+        className="ui-drawer-body"
+        {...(side === 'bottom'
+          ? { tabIndex: 0, role: 'region', 'aria-label': `${title} details` }
+          : {})}
+      >
         {description && (
           <p id={help} className="type-meta ui-drawer-description">
             {description}
@@ -99,5 +105,46 @@ export function Drawer({
         {children}
       </div>
     </dialog>
+  );
+}
+
+/** Only the handle claims a gesture; body scrolling always belongs to the browser. */
+function SwipeHandle({ close }: { close(): void }) {
+  const start = useRef<{ id: number; x: number; y: number } | null>(null);
+  return (
+    <div
+      className="ui-sheet-handle"
+      aria-hidden="true"
+      onPointerDown={(event) => {
+        if (!event.isPrimary || event.button !== 0) return;
+        start.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const gesture = start.current;
+        if (!gesture || gesture.id !== event.pointerId) return;
+        const dx = Math.abs(event.clientX - gesture.x);
+        const dy = event.clientY - gesture.y;
+        // Reject upward/horizontal intent, rather than turning it into a later dismissal.
+        if (dy < -12 || (dx > 12 && dx > Math.abs(dy))) start.current = null;
+      }}
+      onPointerUp={(event) => {
+        const gesture = start.current;
+        start.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        if (!gesture || gesture.id !== event.pointerId) return;
+        const dy = event.clientY - gesture.y;
+        if (dy >= 64 && dy > Math.abs(event.clientX - gesture.x) * 2) close();
+      }}
+      onPointerCancel={() => {
+        start.current = null;
+      }}
+      onLostPointerCapture={() => {
+        start.current = null;
+      }}
+    >
+      <span />
+    </div>
   );
 }

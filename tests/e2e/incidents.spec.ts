@@ -85,6 +85,8 @@ test('filters, URL reload/history, cursor pagination and clear filters', async (
   await expect(page.getByLabel('Sort', { exact: true })).toHaveValue('updated');
   await page.goForward();
   await expect(page.getByLabel('Sort', { exact: true })).toHaveValue('newest');
+  if (!(await page.getByRole('button', { name: 'Clear filters', exact: true }).isVisible()))
+    await page.getByRole('button', { name: /^Filters/ }).click();
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
   await expect(page.getByLabel('P1 · Critical')).not.toBeChecked();
   await expect(page.getByLabel('Investigating', { exact: true })).not.toBeChecked();
@@ -96,6 +98,8 @@ test('filters, URL reload/history, cursor pagination and clear filters', async (
   await expect(page.getByLabel('P4 · Low')).toBeChecked();
   await expect(page.getByLabel('Participant', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Created from (UTC)')).toHaveValue('');
+  if (!(await page.getByRole('button', { name: 'Clear filters', exact: true }).isVisible()))
+    await page.getByRole('button', { name: /^Filters/ }).click();
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
   await expect(page).toHaveURL(/tracking=keep/);
 });
@@ -158,10 +162,10 @@ test('create validates, preserves state on resize, navigates to real detail and 
     page.getByRole('heading', { name: /INC-2873.*Fictional routing degradation/ }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: /INC-2873/ })).toBeFocused();
-  const context = page.getByRole('complementary', { name: 'Incident context', exact: true });
+  await page.getByRole('button', { name: 'Incident context', exact: true }).click();
+  const context = page.getByRole('dialog', { name: 'Incident context', exact: true });
+  await expect(context).toBeVisible();
   await expect(context).toContainText('Participants · 2');
-  if (!(await context.getByRole('list').isVisible()))
-    await context.getByText('Incident context', { exact: true }).click();
   await expect(
     context
       .locator('dt')
@@ -173,6 +177,8 @@ test('create validates, preserves state on resize, navigates to real detail and 
   await expect(context.getByRole('list')).toContainText('River Vale');
   await expect(page.getByLabel('Incident detail')).toContainText('Triggered');
   await expect(page.getByLabel('Incident detail')).toContainText('Aurora Edge');
+  await context.getByRole('button', { name: 'Close Incident context' }).click();
+  await expect(page.getByRole('button', { name: 'Incident context', exact: true })).toBeFocused();
   await expect(page.getByRole('heading', { name: 'Timeline', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Load earlier events', exact: true })).toHaveCount(
     0,
@@ -212,6 +218,12 @@ test('dirty close warns, keeps form on cancel, returns focus; detail missing and
     'Incident not found.',
   );
   await page.goto('/app/incidents/INC-2845');
+  if (await page.evaluate(() => matchMedia('(max-width: 63.99rem)').matches)) {
+    await page.getByRole('button', { name: 'Incident context', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Incident context', exact: true })).toContainText(
+      'Operational writes are closed.',
+    );
+  }
   await expect(page.getByLabel('Incident detail')).toContainText('Operational writes are closed.');
 });
 

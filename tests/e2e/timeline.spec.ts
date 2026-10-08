@@ -378,6 +378,33 @@ test('10,000 server entries and target navigation keep a bounded real browser DO
   }
   await send(page, 'Fictional mobile compose');
   await expect(page.getByText('Fictional mobile compose', { exact: true })).toHaveCount(1);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(`/app/incidents/INC-2841?event=${incidentId}:evt-42`);
+  const target = page.locator(`[data-entry-id="${incidentId}:evt-42"]`);
+  await expect(target).toBeInViewport();
+  const view = page.getByLabel('Timeline viewport', { exact: true });
+  await view.evaluate((element) => element.setAttribute('data-mount-check', 'retained'));
+  const offset = () =>
+    target.evaluate(
+      (element) =>
+        element.getBoundingClientRect().top -
+        element.closest('.timeline-viewport')!.getBoundingClientRect().top,
+    );
+  const before = await offset();
+  await page.getByRole('button', { name: 'Incident context', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Incident context', exact: true })
+    .getByRole('button', { name: 'Close Incident context' })
+    .click();
+  await expect(view).toHaveAttribute('data-mount-check', 'retained');
+  await expect.poll(async () => Math.abs((await offset()) - before)).toBeLessThanOrEqual(8);
+  const earlier = page.waitForResponse(
+    (r) => r.url().includes('/timeline?cursor=') && r.request().method() === 'GET',
+  );
+  await page.getByRole('button', { name: 'Load earlier events', exact: true }).click();
+  await earlier;
+  await expect.poll(async () => Math.abs((await offset()) - before)).toBeLessThanOrEqual(8);
+  expect(await rows(page).count()).toBeLessThan(80);
 });
 
 test('nonparticipant and resolved Timeline are readable but cannot compose', async ({ page }) => {

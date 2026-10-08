@@ -71,7 +71,7 @@ test('one compact toolbar remains reachable at all widths and short heights with
 }) => {
   await login(page);
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
-  for (const width of [320, 768, 1024, 1280, 1440]) {
+  for (const width of [320, 375, 390, 430, 768, 1024, 1280, 1440]) {
     for (const height of [900, 360]) {
       await page.setViewportSize({ width, height });
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -92,7 +92,17 @@ test('one compact toolbar remains reachable at all widths and short heights with
         .toBeLessThanOrEqual(2);
       const bounds = (await filters(page).boundingBox())!;
       expect(bounds.y).toBe(56);
-      expect(bounds.height).toBeLessThanOrEqual(64);
+      expect(bounds.height).toBeLessThanOrEqual(width < 768 ? 96 : 64);
+      if (width < 768) {
+        expect(
+          await filters(page).evaluate(
+            (element) => element.nextElementSibling?.getBoundingClientRect().height,
+          ),
+        ).toBe(0);
+        await expect(
+          filters(page).getByRole('checkbox', { name: 'Assigned to me', exact: true }),
+        ).toBeInViewport();
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );
@@ -101,6 +111,15 @@ test('one compact toolbar remains reachable at all widths and short heights with
       await toggle.focus();
       await toggle.press('Enter');
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      if (width < 768) {
+        expect((await filters(page).boundingBox())!.height).toBeCloseTo(bounds.height, 0);
+        expect(
+          Math.abs(
+            (await first.evaluate((element) => element.getBoundingClientRect().top + scrollY)) -
+              original,
+          ),
+        ).toBeLessThanOrEqual(2);
+      }
       await expect(
         filters(page).getByRole('checkbox', { name: 'Assigned to me', exact: true }),
       ).toHaveCount(1);
@@ -187,6 +206,10 @@ test('sticky sort and filters keep URL history, unknown parameters and one contr
   await expect(sort).toHaveValue('updated');
   await page.goForward();
   await expect(sort).toHaveValue('severity');
+  // Native history restoration can legitimately return to the expanded toolbar at the top.
+  // Re-establish the sticky position before exercising its compact trigger.
+  await page.evaluate(() => window.scrollTo(0, 700));
+  await expect(filters(page)).toHaveAttribute('data-compact', 'true');
   await filters(page)
     .getByRole('button', { name: /^Filters/ })
     .click();

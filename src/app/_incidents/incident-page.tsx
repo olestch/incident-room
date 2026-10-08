@@ -200,18 +200,37 @@ function IdentityIncidentPage({
     if (!number) return;
     const content = document.getElementById('main-content');
     const viewport = window.visualViewport;
-    if (!content || !viewport) return;
-    const update = () =>
-      content.style.setProperty('--room-viewport-height', `${viewport.height}px`);
+    if (!content) return;
+    const update = () => {
+      const height = viewport?.height ?? window.innerHeight;
+      const shellAbove = Math.max(
+        0,
+        content.getBoundingClientRect().top - (viewport?.offsetTop ?? 0),
+      );
+      content.style.setProperty('--room-viewport-height', `${height}px`);
+      content.style.setProperty('--room-viewport-offset', `${viewport?.offsetTop ?? 0}px`);
+      content.style.setProperty('--room-available-height', `${Math.max(0, height - shellAbove)}px`);
+    };
     update();
-    viewport.addEventListener('resize', update);
+    viewport?.addEventListener('resize', update);
+    viewport?.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    const header = document.querySelector('.shell-topbar');
+    if (header) observer?.observe(header);
     return () => {
-      viewport.removeEventListener('resize', update);
+      viewport?.removeEventListener('resize', update);
+      viewport?.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+      observer?.disconnect();
       content.style.removeProperty('--room-viewport-height');
+      content.style.removeProperty('--room-viewport-offset');
+      content.style.removeProperty('--room-available-height');
     };
   }, [number]);
   useEffect(() => {
-    if (number && hasContext) document.getElementById('incident-heading')?.focus();
+    if (number && hasContext)
+      document.getElementById('incident-heading')?.focus({ preventScroll: true });
   }, [number, hasContext]);
   const errorView = (error: Error, retry: () => void) => (
     <div role="alert" className="my-4">
@@ -250,6 +269,7 @@ function IdentityIncidentPage({
             >
               <ArrowLeft size={16} aria-hidden="true" />{' '}
               <span className="room-back-label">Back to incidents</span>
+              <span className="room-back-mobile-label">Back to list</span>
             </Link>
             <div className="room-loading">
               {(detail.isPending || (detail.data && users.isPending)) && (
@@ -268,7 +288,11 @@ function IdentityIncidentPage({
               users.data &&
               !inaccessible(detail.error) &&
               !inaccessible(users.error) && (
-                <IncidentDetails incident={detail.data} users={users.data}>
+                <IncidentDetails
+                  incident={detail.data}
+                  users={users.data}
+                  threadOpen={params.get('thread') !== null}
+                >
                   {current.data && <PostmortemEntry incident={detail.data} actor={current.data} />}
                 </IncidentDetails>
               )}
@@ -312,8 +336,16 @@ function IdentityIncidentPage({
           <p className="discovery-description">Track service impact and coordinate a response.</p>
         </div>
         {current.data && canCreateIncident(current.data, workspaceId) && (
-          <Button variant="primary" disabled={!users.data} onClick={() => setCreating(true)}>
-            <Plus size={17} aria-hidden="true" /> Create Incident
+          <Button
+            variant="primary"
+            aria-label="Create Incident"
+            disabled={!users.data}
+            onClick={() => setCreating(true)}
+          >
+            <Plus size={17} aria-hidden="true" />{' '}
+            <span>
+              Create<span className="create-incident-suffix"> Incident</span>
+            </span>
           </Button>
         )}
       </div>

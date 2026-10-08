@@ -6,9 +6,10 @@
 .shell-content:has(> .incident-room) {
   display: flex;
   flex-direction: column;
-  height: calc(var(--room-viewport-height, 100dvh) - var(--shell-topbar-height));
+  height: var(--room-available-height, calc(100dvh - var(--shell-topbar-height)));
   min-height: 0;
   padding-block: 0.75rem;
+  container: room-workspace / size;
 }
 .shell-content:has(> .incident-room) > .shell-notices {
   flex-shrink: 0;
@@ -38,6 +39,9 @@
   font-size: var(--text-meta);
   padding-inline: 0.5rem;
   margin-left: -0.5rem;
+}
+.room-back-mobile-label {
+  display: none;
 }
 .incident-command-strip {
   padding: 0.25rem 0;
@@ -604,11 +608,53 @@
   }
 }
 @media (max-width: 63.99rem) {
+  .shell-content:has(> .incident-room) {
+    padding-block: 0.25rem;
+    padding-inline: 0.5rem;
+  }
+  .incident-room .incident-room-layout {
+    gap: 0.25rem;
+  }
+  .room-context-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    max-height: none;
+    padding: 0;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+  .room-loading .room-identity {
+    display: none;
+  }
+  .room-context-panel > .room-context-rail {
+    display: none;
+  }
+  .room-loading > .incident-command-strip {
+    padding: 0;
+  }
+  .room-loading h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .room-back-mobile-label {
+    display: inline;
+  }
+  .room-context-trigger {
+    white-space: nowrap;
+    padding-inline: 0.5rem;
+  }
   .room-back {
-    float: left;
-    margin: 0 0.375rem 0 0;
+    margin: 0;
     padding: 0.5rem;
-    width: 2.75rem;
+    flex-shrink: 0;
   }
   .room-back-label {
     display: none;
@@ -619,7 +665,7 @@
   .incident-command-strip h1 {
     clear: both;
   }
-  body:has(.incident-room .thread-surface) {
+  body:has(.incident-room) {
     overflow: hidden;
   }
   .incident-command-strip h1 {
@@ -687,6 +733,32 @@
   .shell-sidebar:has(+ .shell-content > .incident-room) .shell-navigation {
     height: auto;
     min-height: 100%;
+  }
+}
+/* Software keyboards can shrink the visual viewport without changing height media queries. */
+@container room-workspace (max-height: 28.5rem) {
+  .room-realtime {
+    padding-block: 0;
+  }
+  .room-connection {
+    min-height: 1.5rem;
+  }
+  .room-stream-heading {
+    padding-block: 0;
+  }
+  .compose-editor {
+    max-height: 4rem;
+  }
+  .compose-help,
+  .compose-draft {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 @media (max-width: 63.99rem) and (max-height: 32rem) {

@@ -99,10 +99,12 @@ test('compact Discuss, responsive context and native mention pickers preserve bo
   await expect(timeline.getByLabel('Message', { exact: true })).toBeFocused();
   await expect(timeline.getByLabel('Mention picker')).toBeHidden();
   await page.setViewportSize({ width: 320, height: 800 });
-  const context = page.getByRole('complementary', { name: 'Incident context', exact: true });
-  await context.getByText('Incident context', { exact: true }).click();
+  await page.getByRole('button', { name: 'Incident context', exact: true }).click();
+  const context = page.getByRole('dialog', { name: 'Incident context', exact: true });
+  await expect(context).toBeVisible();
   await expect(context).toContainText('Commander');
-  await context.getByText('Incident context', { exact: true }).click();
+  await context.getByRole('button', { name: 'Close Incident context' }).click();
+  await expect(page.getByRole('button', { name: 'Incident context', exact: true })).toBeFocused();
   await expect(timeline.getByLabel('Message', { exact: true })).toHaveValue(
     'Timeline draft @Sage Linden [demo-sage] ',
   );
