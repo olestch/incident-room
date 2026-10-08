@@ -700,6 +700,12 @@
     white-space: nowrap;
     padding-inline: 0.5rem;
   }
+  @media (hover: none), (pointer: coarse) {
+    /* Touch can retain :hover after the native dialog restores its opener. */
+    .room-context-trigger:hover:not(:disabled) {
+      background: var(--color-surface);
+    }
+  }
   .room-back {
     margin: 0;
     padding: 0.5rem;

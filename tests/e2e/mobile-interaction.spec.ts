@@ -79,6 +79,99 @@ async function open(page: Page) {
   await expect(sheet(page)).toHaveAttribute('data-sheet-phase', 'open');
 }
 
+test('context dismissal clears touch hover appearance while restoring keyboard focus', async ({
+  page,
+  context,
+}) => {
+  await room(page);
+  const button = trigger(page);
+  const appearance = () =>
+    button.evaluate((element) => ({
+      background: getComputedStyle(element).backgroundColor,
+      border: getComputedStyle(element).borderColor,
+      active: element.matches(':active'),
+      focusVisible: element.matches(':focus-visible'),
+    }));
+  const neutral = await appearance();
+  const cdp = await context.newCDPSession(page);
+  // Exercise a coarse pointer even in the desktop project, without replacing real touch events.
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  await expect.poll(() => page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+  const tap = async (x: number, y: number) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  const closeByTouch = async () => {
+    const rect = (await page
+      .getByRole('button', { name: 'Close Incident context', exact: true })
+      .boundingBox())!;
+    await tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  };
+  const tapTrigger = async () => {
+    const rect = (await button.boundingBox())!;
+    await tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    await expect(sheet(page)).toHaveAttribute('data-sheet-phase', 'open');
+  };
+  await tapTrigger();
+  await closeByTouch();
+  await expect(sheet(page)).toHaveCount(0);
+  expect((await appearance()).focusVisible).toBe(false);
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    await page.emulateMedia({ reducedMotion });
+    for (const method of ['swipe', 'close', 'backdrop', 'escape', 'swipe'] as const) {
+      // A compatibility mouse click leaves the pointer over the trigger. The following
+      // genuine touch swipe reproduces Chromium's retained :hover after the dialog closes.
+      await open(page);
+      await expect(button).toHaveAttribute('aria-expanded', 'true');
+      if (method === 'swipe') {
+        const rect = (await sheet(page).locator('.ui-sheet-handle').boundingBox())!;
+        let time = Date.now() / 1000;
+        for (const [type, dy, delta] of [
+          ['touchStart', 22, 0.1],
+          ['touchMove', 202, 0.4],
+          ['touchEnd', 0, 0.2],
+        ] as const) {
+          time += delta;
+          await cdp.send('Input.dispatchTouchEvent', {
+            type,
+            timestamp: time,
+            touchPoints:
+              type === 'touchEnd' ? [] : [{ x: rect.x + rect.width / 2, y: rect.y + dy }],
+          });
+        }
+      } else if (method === 'close') {
+        await closeByTouch();
+      } else if (method === 'backdrop') {
+        await tap(8, 8);
+      } else {
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Escape');
+      }
+      await expect(sheet(page)).toHaveCount(0);
+      await expect(button).toHaveAttribute('aria-expanded', 'false');
+      await expect(button).toBeFocused();
+      if (method === 'swipe')
+        await expect.poll(() => button.evaluate((element) => element.matches(':hover'))).toBe(true);
+      await expect.poll(async () => (await appearance()).background).toBe(neutral.background);
+      await expect.poll(async () => (await appearance()).border).toBe(neutral.border);
+      expect((await appearance()).active).toBe(false);
+      if (method === 'escape') {
+        expect((await appearance()).focusVisible).toBe(true);
+        expect(await button.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe(
+          'solid',
+        );
+      }
+    }
+    // Pure touch activation also remains usable immediately after these mixed-input cycles.
+    await tapTrigger();
+    await closeByTouch();
+    await expect(sheet(page)).toHaveCount(0);
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+    await expect.poll(async () => (await appearance()).background).toBe(neutral.background);
+  }
+  await cdp.detach();
+});
+
 test('Timeline controls use compact faces, separate 44px targets, available-width labels and unchanged actions', async ({
   page,
 }) => {
