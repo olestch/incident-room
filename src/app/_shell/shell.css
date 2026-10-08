@@ -233,6 +233,12 @@ body:has(.ui-drawer-bottom[open]) {
 .ui-drawer::backdrop {
   background: var(--overlay-scrim);
 }
+.ui-drawer-bottom::backdrop {
+  opacity: var(--sheet-backdrop-opacity, 1);
+}
+.ui-drawer-bottom[data-sheet-phase='dragging'] .ui-sheet-handle {
+  cursor: grabbing;
+}
 .ui-drawer-header {
   display: flex;
   align-items: center;
@@ -627,5 +633,8 @@ body:has(.ui-drawer-bottom[open]) {
   }
   .ui-button {
     border-color: ButtonText;
+  }
+  .ui-sheet-handle > span {
+    background: CanvasText;
   }
 }

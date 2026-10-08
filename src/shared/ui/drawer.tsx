@@ -2,6 +2,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from './primitives';
+import { createSheetMotion } from './sheet-motion';
 
 /** Content stays mounted while closed; presentation never owns its runtime. */
 export function Drawer({
@@ -11,6 +12,7 @@ export function Drawer({
   children,
   side = 'right',
   description,
+  immediateClose = false,
 }: {
   open: boolean;
   close(): void;
@@ -18,13 +20,47 @@ export function Drawer({
   children: ReactNode;
   side?: 'left' | 'right' | 'bottom';
   description?: string;
+  /** Route/modal handoff must not wait for a decorative exit. */
+  immediateClose?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const heading = useId();
   const help = useId();
+  const motion = useRef<ReturnType<typeof createSheetMotion> | null>(null);
+  const dismiss = useRef(close);
+  useEffect(() => {
+    dismiss.current = close;
+  }, [close]);
+  useEffect(() => {
+    if (side !== 'bottom') return;
+    const controller = createSheetMotion(
+      dialog.current!,
+      () => dismiss.current(),
+      () => {
+        // A newer Thread/modal owns focus during an immediate handoff.
+        if (
+          !document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]') &&
+          opener.current?.isConnected
+        )
+          opener.current.focus({ preventScroll: true });
+      },
+    );
+    motion.current = controller;
+    return () => {
+      controller.dispose();
+      motion.current = null;
+    };
+  }, [side]);
   useEffect(() => {
     const element = dialog.current!;
+    if (side === 'bottom') {
+      if (open && !element.open)
+        opener.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      motion.current?.sync(open, immediateClose);
+      return;
+    }
     if (open && !element.open) {
       opener.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -33,7 +69,7 @@ export function Drawer({
       element.close();
       if (opener.current?.isConnected) opener.current.focus({ preventScroll: true });
     }
-  }, [open]);
+  }, [open, side, immediateClose]);
   useEffect(() => {
     const element = dialog.current;
     return () => element?.close();
@@ -82,7 +118,11 @@ export function Drawer({
           close();
       }}
     >
-      {side === 'bottom' && <SwipeHandle close={close} />}
+      {side === 'bottom' && (
+        <div className="ui-sheet-handle" aria-hidden="true">
+          <span />
+        </div>
+      )}
       <header className="ui-drawer-header">
         <h2 id={heading} className="type-section">
           {title}
@@ -105,46 +145,5 @@ export function Drawer({
         {children}
       </div>
     </dialog>
-  );
-}
-
-/** Only the handle claims a gesture; body scrolling always belongs to the browser. */
-function SwipeHandle({ close }: { close(): void }) {
-  const start = useRef<{ id: number; x: number; y: number } | null>(null);
-  return (
-    <div
-      className="ui-sheet-handle"
-      aria-hidden="true"
-      onPointerDown={(event) => {
-        if (!event.isPrimary || event.button !== 0) return;
-        start.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={(event) => {
-        const gesture = start.current;
-        if (!gesture || gesture.id !== event.pointerId) return;
-        const dx = Math.abs(event.clientX - gesture.x);
-        const dy = event.clientY - gesture.y;
-        // Reject upward/horizontal intent, rather than turning it into a later dismissal.
-        if (dy < -12 || (dx > 12 && dx > Math.abs(dy))) start.current = null;
-      }}
-      onPointerUp={(event) => {
-        const gesture = start.current;
-        start.current = null;
-        if (event.currentTarget.hasPointerCapture(event.pointerId))
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        if (!gesture || gesture.id !== event.pointerId) return;
-        const dy = event.clientY - gesture.y;
-        if (dy >= 64 && dy > Math.abs(event.clientX - gesture.x) * 2) close();
-      }}
-      onPointerCancel={() => {
-        start.current = null;
-      }}
-      onLostPointerCapture={() => {
-        start.current = null;
-      }}
-    >
-      <span />
-    </div>
   );
 }

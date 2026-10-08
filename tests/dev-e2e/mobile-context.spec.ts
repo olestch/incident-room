@@ -23,11 +23,23 @@ test('development effect replay keeps one mobile context sheet and the existing 
     await trigger.click();
     await expect(sheet).toHaveCount(1);
     await expect(sheet).toContainText('Commander');
+    await expect(sheet).toHaveAttribute('data-sheet-phase', 'open');
     await expect(sheet.getByRole('button', { name: 'Close Incident context' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(viewport).toHaveAttribute('data-mount-check', 'retained');
+    expect(
+      await page.evaluate(() =>
+        document
+          .getAnimations()
+          .some(
+            (animation) =>
+              animation.effect instanceof KeyframeEffect &&
+              (animation.effect.target as Element | null)?.classList.contains('ui-drawer-bottom'),
+          ),
+      ),
+    ).toBe(false);
   }
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(

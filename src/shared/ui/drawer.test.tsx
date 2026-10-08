@@ -101,8 +101,11 @@ it('sheet handle dismisses only a completed downward gesture and never a cancell
   handle.setPointerCapture = vi.fn();
   handle.hasPointerCapture = vi.fn(() => true);
   handle.releasePointerCapture = vi.fn();
+  let timestamp = 0;
   const pointer = (type: string, x: number, y: number) => {
     const event = new Event(type, { bubbles: true });
+    // These are slow distance/cancellation gestures, not short fast flicks.
+    Object.defineProperty(event, 'timeStamp', { value: (timestamp += 200) });
     Object.assign(event, { pointerId: 1, isPrimary: true, button: 0, clientX: x, clientY: y });
     fireEvent(handle, event);
   };

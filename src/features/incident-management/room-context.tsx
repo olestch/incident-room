@@ -83,6 +83,7 @@ export function IncidentDetails({
           side="bottom"
           title="Incident context"
           open={sheetOpen && !threadOpen}
+          immediateClose={threadOpen}
           close={() => setSheetOpen(false)}
         >
           <div className="room-context-rail">

@@ -46,6 +46,18 @@ async function room(page: Page, longContent = false) {
   await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
 }
 async function anchor(view: Locator) {
+  await expect
+    .poll(() =>
+      view.evaluate((element) => {
+        const top = element.getBoundingClientRect().top;
+        return [...element.querySelectorAll<HTMLElement>('[data-entry-id]')].some(
+          (item) =>
+            item.getBoundingClientRect().bottom > top &&
+            item.getBoundingClientRect().top <= top + 40,
+        );
+      }),
+    )
+    .toBe(true);
   return view.evaluate((element) => {
     const top = element.getBoundingClientRect().top;
     const row = [...element.querySelectorAll<HTMLElement>('[data-entry-id]')].find(
@@ -206,6 +218,7 @@ test('touch scrolling belongs to context content; only a completed downward hand
 }) => {
   await room(page, true);
   await trigger(page).click();
+  await expect(sheet(page)).toHaveAttribute('data-sheet-phase', 'open');
   const cdp = await context.newCDPSession(page);
   const touch = async (
     type: 'touchStart' | 'touchMove' | 'touchEnd' | 'touchCancel',
@@ -232,11 +245,11 @@ test('touch scrolling belongs to context content; only a completed downward hand
   await touch('touchStart', 150, y);
   await touch('touchMove', 220, y + 10);
   await touch('touchEnd');
-  await expect(sheet(page)).toBeVisible();
+  await expect(sheet(page)).toHaveAttribute('data-sheet-phase', 'open');
   await touch('touchStart', 195, y);
   await touch('touchMove', 195, y + 90);
   await touch('touchCancel');
-  await expect(sheet(page)).toBeVisible();
+  await expect(sheet(page)).toHaveAttribute('data-sheet-phase', 'open');
   await touch('touchStart', 195, y);
   await touch('touchMove', 195, y + 90);
   await touch('touchEnd');
@@ -301,11 +314,12 @@ test('visual viewport keyboard changes preserve historical anchors and keep the 
   ).toBeGreaterThan(0);
   await retained(viewport(page), before);
   await trigger(page).click();
-  await expect(sheet(page)).toBeVisible();
+  await expect(sheet(page)).toHaveAttribute('data-sheet-phase', 'open');
   const keyboardSheet = (await sheet(page).boundingBox())!;
   expect(keyboardSheet.y).toBeGreaterThanOrEqual(0);
   expect(keyboardSheet.y + keyboardSheet.height).toBeLessThanOrEqual(360);
   await page.keyboard.press('Escape');
+  await expect(sheet(page)).toHaveCount(0);
   await retained(viewport(page), before);
   await page.evaluate(() => {
     Reflect.deleteProperty(visualViewport!, 'height');

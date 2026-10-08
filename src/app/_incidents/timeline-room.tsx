@@ -8,7 +8,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowDownToLine, History, RotateCcw } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpToLine, History, RotateCcw } from 'lucide-react';
 import { Button } from '@/shared/ui/primitives';
 import type { CurrentUser, WorkspaceUser } from '@/entities/current-user/model';
 import type { Incident } from '@/entities/incident/model';
@@ -399,17 +399,29 @@ export function TimelineRoom({
             {history.hasNextPage && (
               <Button
                 className="room-event-action"
+                aria-label="Load earlier events"
                 aria-busy={history.isFetchingNextPage}
                 disabled={history.isFetching}
                 onClick={() => void history.fetchNextPage({ cancelRefetch: false })}
               >
-                <History size={14} aria-hidden="true" />
-                {history.isFetchingNextPage ? 'Loading events…' : 'Load earlier events'}
+                <span className="room-event-control" aria-hidden="true">
+                  <History className="room-event-desktop-icon" size={14} />
+                  <ArrowUpToLine className="room-event-mobile-icon" size={14} />
+                  <span className="room-event-full-label">
+                    {history.isFetchingNextPage ? 'Loading events…' : 'Load earlier events'}
+                  </span>
+                  <span className="room-event-short-label">
+                    {history.isFetchingNextPage ? 'Loading…' : 'Earlier'}
+                  </span>
+                </span>
               </Button>
             )}
-            <Button className="room-event-action" onClick={goLatest}>
-              <ArrowDownToLine size={14} aria-hidden="true" />
-              Jump to latest
+            <Button className="room-event-action" aria-label="Jump to latest" onClick={goLatest}>
+              <span className="room-event-control" aria-hidden="true">
+                <ArrowDownToLine size={14} />
+                <span className="room-event-full-label">Jump to latest</span>
+                <span className="room-event-short-label">Latest</span>
+              </span>
             </Button>
           </div>
         </div>

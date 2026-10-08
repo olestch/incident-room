@@ -205,16 +205,65 @@
   font-size: var(--text-time);
   white-space: nowrap;
 }
-@media (max-width: 47.99rem) {
+.room-event-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.room-event-short-label,
+.room-event-mobile-icon {
+  display: none;
+}
+@media (max-width: 63.99rem) {
+  .room-timeline > .room-stream-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-block: 0;
+  }
+  .room-history-actions {
+    justify-content: flex-end;
+    container: timeline-actions / inline-size;
+  }
   .room-event-action.ui-button {
-    padding: 0.375rem 0.25rem;
-    font-size: 0.6875rem;
+    min-height: 2.75rem;
+    padding: 0.3125rem 0;
+    border: 0;
+    background: transparent;
+    font-size: 0.8125rem;
+    line-height: 1rem;
+  }
+  .room-event-control {
+    height: 2.125rem;
+    padding-inline: 0.375rem;
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-control);
+    background: var(--color-surface);
+  }
+  .room-event-action:hover:not(:disabled) .room-event-control {
+    background: var(--color-surface-secondary);
+  }
+  .room-event-desktop-icon {
+    display: none;
+  }
+  .room-event-mobile-icon {
+    display: block;
+  }
+}
+/* Full labels need about 18rem together; query their actual allocated space. */
+@container timeline-actions (max-width: 18rem) {
+  .room-event-full-label {
+    display: none;
+  }
+  .room-event-short-label {
+    display: inline;
+  }
+}
+@media (forced-colors: active) {
+  .room-event-control {
+    border-color: ButtonText;
   }
 }
 @media (max-width: 23.99rem) {
-  .room-event-action > svg {
-    display: none;
-  }
   .room-timeline > .room-stream-heading h2 {
     font-size: var(--text-meta);
     line-height: var(--text-meta--line-height);
