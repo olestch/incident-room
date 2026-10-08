@@ -89,6 +89,10 @@ export function useListRealtime(enabled: boolean, userId: string, workspaceId: s
     const online = () => service.setOnline(demoOnline());
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
+    // MSW closes this document in beforeunload. Cancel its polling before that listener runs.
+    window.addEventListener('beforeunload', offline, { capture: true });
+    window.addEventListener('pagehide', offline);
+    window.addEventListener('pageshow', online);
     service.start();
     const unbindDemo = bindDemoConnection((online) => service.setOnline(online));
     if (!navigator.onLine) service.setOnline(false);
@@ -99,6 +103,9 @@ export function useListRealtime(enabled: boolean, userId: string, workspaceId: s
       remove();
       window.removeEventListener('offline', offline);
       window.removeEventListener('online', online);
+      window.removeEventListener('beforeunload', offline, { capture: true });
+      window.removeEventListener('pagehide', offline);
+      window.removeEventListener('pageshow', online);
     };
   }, [enabled, userId, workspaceId, session, adapter, cache]);
 }
