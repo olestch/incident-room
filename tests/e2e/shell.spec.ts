@@ -27,6 +27,7 @@ test('shell is responsive at all acceptance widths with truthful navigation and 
       await expect(page.locator('.shell-sidebar')).not.toBeVisible();
       await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
       const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true });
+      await expect(drawer.getByRole('link', { name: 'My Incidents', exact: true })).toHaveCount(0);
       await expect(drawer.getByRole('link', { name: 'Incidents', exact: true })).toHaveAttribute(
         'aria-current',
         'page',
@@ -37,6 +38,7 @@ test('shell is responsive at all acceptance widths with truthful navigation and 
       ).toBeFocused();
     } else {
       const sidebar = page.locator('.shell-sidebar');
+      await expect(sidebar.getByRole('link', { name: 'My Incidents', exact: true })).toHaveCount(0);
       expect(await sidebar.evaluate((node) => node.getBoundingClientRect().width)).toBe(
         width < 1280 ? 64 : 216,
       );
@@ -46,9 +48,12 @@ test('shell is responsive at all acceptance widths with truthful navigation and 
       if (width === 1024) await expect(incidents.locator('.shell-nav-tooltip')).toBeVisible();
     }
   }
-  await navigateApp(page, 'My Incidents');
+  await page.getByRole('checkbox', { name: 'Assigned to me', exact: true }).click();
   await expect(page).toHaveURL('/app/incidents?assignedToMe=true');
   await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
+  await expect(
+    page.locator('.shell-sidebar').getByRole('link', { name: 'Incidents', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
 });
 
 test('user popover supports keyboard, Escape restoration, light dismissal and real profile navigation', async ({

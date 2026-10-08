@@ -8,7 +8,8 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RotateCcw } from 'lucide-react';
+import { ArrowDownToLine, History, RotateCcw } from 'lucide-react';
+import { Button } from '@/shared/ui/primitives';
 import type { CurrentUser, WorkspaceUser } from '@/entities/current-user/model';
 import type { Incident } from '@/entities/incident/model';
 import { incidentKeys } from '@/entities/incident/model';
@@ -396,24 +397,20 @@ export function TimelineRoom({
               </button>
             )}
             {history.hasNextPage && (
-              <button
-                className="incident-button room-latest"
-                aria-label={
-                  history.isFetchingNextPage ? 'Loading older history…' : 'Load older history'
-                }
+              <Button
+                className="room-event-action"
+                aria-busy={history.isFetchingNextPage}
                 disabled={history.isFetching}
                 onClick={() => void history.fetchNextPage({ cancelRefetch: false })}
               >
-                {history.isFetchingNextPage ? 'Loading…' : 'Load older'}
-              </button>
+                <History size={14} aria-hidden="true" />
+                {history.isFetchingNextPage ? 'Loading events…' : 'Load earlier events'}
+              </Button>
             )}
-            <button
-              className="incident-button room-latest"
-              aria-label="Go to latest"
-              onClick={goLatest}
-            >
-              Latest
-            </button>
+            <Button className="room-event-action" onClick={goLatest}>
+              <ArrowDownToLine size={14} aria-hidden="true" />
+              Jump to latest
+            </Button>
           </div>
         </div>
         <RealtimeSummary

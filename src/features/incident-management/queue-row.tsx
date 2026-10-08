@@ -16,7 +16,7 @@ export function IncidentQueueRow({
   const updated = new Date(incident.updatedAt);
   const fullTime = `${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(updated)} UTC`;
   return (
-    <li className="queue-row">
+    <li className="queue-row" data-severity={incident.severity} data-status={incident.status}>
       <div className="queue-severity">
         <SeverityBadge severity={incident.severity} />
       </div>

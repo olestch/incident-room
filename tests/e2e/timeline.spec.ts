@@ -72,6 +72,12 @@ test('history prepend preserves an actual reading anchor within 8px and DOM stay
   page,
 }) => {
   await room(page);
+  await expect(page.getByRole('button', { name: 'Load earlier events', exact: true })).toHaveClass(
+    /ui-button-secondary/,
+  );
+  await expect(page.getByRole('button', { name: 'Jump to latest', exact: true })).toHaveClass(
+    /ui-button-secondary/,
+  );
   const viewport = page.getByLabel('Timeline viewport', { exact: true });
   await viewport.evaluate((element) => {
     element.scrollTop = 400;
@@ -83,7 +89,7 @@ test('history prepend preserves an actual reading anchor within 8px and DOM stay
     )!;
     return { id: row.dataset.entryId!, offset: row.getBoundingClientRect().top - top };
   });
-  await page.getByRole('button', { name: 'Load older history', exact: true }).click();
+  await page.getByRole('button', { name: 'Load earlier events', exact: true }).click();
   await expect
     .poll(async () =>
       page
@@ -344,7 +350,7 @@ test('rapid URL target replacement supersedes navigation; missing target has no 
     page.getByRole('status').filter({ hasText: 'Timeline target missing.' }),
   ).toBeVisible();
   await expect(page).toHaveURL(/event=missing-event/);
-  await expect(page.getByRole('button', { name: 'Go to latest', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Jump to latest', exact: true })).toBeEnabled();
 });
 
 test('10,000 server entries and target navigation keep a bounded real browser DOM; responsive compose stays usable', async ({

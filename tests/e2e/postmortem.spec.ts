@@ -393,7 +393,9 @@ test('secondary surfaces and palette fit supported widths and system contrast pr
   await page.getByRole('button', { name: 'Commands', exact: true }).focus();
   await expect(input).toBeFocused();
   await input.press('ArrowDown');
-  await expect(page.getByRole('option', { selected: true })).toContainText('My Incidents');
+  await expect(page.getByRole('option', { selected: true })).toContainText(
+    'Show incidents assigned to me',
+  );
   await input.press('Escape');
   await expect(page.getByRole('button', { name: 'Commands', exact: true })).toBeFocused();
 });

@@ -1,4 +1,3 @@
-import { navigateApp } from './shell-helpers';
 import { expect, test, type Page } from '@playwright/test';
 
 async function login(page: Page, email = 'river.vale@example.test') {
@@ -100,11 +99,11 @@ test('filters, URL reload/history, cursor pagination and clear filters', async (
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
   await expect(page).toHaveURL(/tracking=keep/);
 });
-test('My Incidents uses current stable identity; dates and participant apply to createdAt', async ({
+test('Assigned to me uses current stable identity; dates and participant apply to createdAt', async ({
   page,
 }) => {
   await login(page, 'sage.linden@example.test');
-  await navigateApp(page, 'My Incidents');
+  await page.getByRole('checkbox', { name: 'Assigned to me', exact: true }).click();
   await expect(page).toHaveURL('/app/incidents?assignedToMe=true');
   await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
   for (const row of await page
@@ -175,6 +174,10 @@ test('create validates, preserves state on resize, navigates to real detail and 
   await expect(page.getByLabel('Incident detail')).toContainText('Triggered');
   await expect(page.getByLabel('Incident detail')).toContainText('Aurora Edge');
   await expect(page.getByRole('heading', { name: 'Timeline', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Load earlier events', exact: true })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole('button', { name: 'Jump to latest', exact: true })).toBeEnabled();
   await expect(
     page.getByText('No Timeline entries yet. The first message will start this incident history.'),
   ).toBeVisible();

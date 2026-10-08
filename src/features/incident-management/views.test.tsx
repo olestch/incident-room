@@ -6,6 +6,7 @@ import { AppError } from '@/shared/errors/app-error';
 import { emptyFilters } from '@/entities/incident/filters';
 import { CreateIncidentDialog, IncidentContext, IncidentFiltersView } from './views';
 import { seedIncidents } from './authority';
+import { IncidentQueueRow } from './queue-row';
 
 const users: WorkspaceUser[] = [
   {
@@ -44,6 +45,22 @@ beforeEach(() => {
   ) {
     this.removeAttribute('open');
   });
+});
+it('keeps severity and lifecycle metadata with one native link and no nested controls per row', () => {
+  const incident = seedIncidents().incidents[24]!;
+  const { container } = render(
+    <ul>
+      <IncidentQueueRow incident={incident} users={users} />
+    </ul>,
+  );
+  const row = screen.getByRole('listitem');
+  expect(row).toHaveAttribute('data-severity', 'P1');
+  expect(row).toHaveAttribute('data-status', 'resolved');
+  expect(row).toHaveTextContent('P1 Critical');
+  expect(row).toHaveTextContent('Resolved');
+  expect(screen.getByRole('link')).toHaveAttribute('href', '/app/incidents/INC-2865');
+  expect(screen.getAllByRole('link')).toHaveLength(1);
+  expect(container.querySelector('a button, a input, a a')).toBeNull();
 });
 it('renders normalized summary and detail with readable states, names and UTC timestamps', () => {
   render(<IncidentContext incident={seedIncidents().incidents[4]!} users={users} detail />);

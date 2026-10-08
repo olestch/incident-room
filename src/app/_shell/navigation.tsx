@@ -1,10 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { Bell, FlaskConical, ListFilter, ListTodo, Search, Settings, Users } from 'lucide-react';
+import { Bell, FlaskConical, ListTodo, Search, Settings, Users } from 'lucide-react';
 
 const destinations = [
   { label: 'Incidents', href: '/app/incidents', icon: ListTodo },
-  { label: 'My Incidents', href: '/app/incidents?assignedToMe=true', icon: ListFilter },
   { label: 'Search', href: '/app/search', icon: Search },
   { label: 'Notifications', href: '/app/notifications', icon: Bell },
   { label: 'Team', href: '/app/team', icon: Users },
@@ -12,20 +11,17 @@ const destinations = [
 
 export function ShellNavigation({
   pathname,
-  assigned,
   unread,
   navigate,
   openDemo,
 }: {
   pathname: string;
-  assigned: boolean;
   unread: number | undefined;
   navigate(event: { preventDefault(): void }): void;
   openDemo(): void;
 }) {
   const active = (label: string, href: string) => {
-    if (label === 'Incidents') return pathname.startsWith('/app/incidents') && !assigned;
-    if (label === 'My Incidents') return pathname === '/app/incidents' && assigned;
+    if (label === 'Incidents') return pathname.startsWith('/app/incidents');
     return pathname === href;
   };
   return (

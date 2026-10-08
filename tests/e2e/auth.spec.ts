@@ -1,4 +1,4 @@
-import { navigateApp, signOut } from './shell-helpers';
+import { signOut } from './shell-helpers';
 import { expect, test, type Page } from '@playwright/test';
 
 const password = 'Fictional-pass-42';
@@ -65,7 +65,7 @@ test('protected redirect, login, reload, logout and identity switch stay isolate
   await expect(page.getByLabel('Current user')).toContainText('Sage Linden');
   await expect(page.getByLabel('Current user')).not.toContainText('River Vale');
   // Workspace incident commanders remain readable; only identity-owned profile changes.
-  await navigateApp(page, 'My Incidents');
+  await page.getByRole('checkbox', { name: 'Assigned to me', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
   expect(browserErrors).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

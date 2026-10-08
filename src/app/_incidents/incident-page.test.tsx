@@ -331,7 +331,7 @@ it('Thread unavailable root error stays explicit and does not replace usable Tim
   expect(within(threadSurface()).queryByText(/No replies yet/)).toBeNull();
   expect(within(threadSurface()).queryByRole('textbox')).toBeNull();
 });
-it('loads server data, applies URL filters and My Incidents, clears and resets pagination', async () => {
+it('loads server data, applies URL filters and assigned-to-me, clears and resets pagination', async () => {
   const user = userEvent.setup();
   mount();
   expect(screen.getByRole('status')).toHaveTextContent('Loading incidents');
@@ -682,7 +682,7 @@ it('Timeline pagination error preserves confirmed window and retries the same op
       );
     }),
   );
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Load older history' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Load earlier events' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load Timeline history');
   expect(cache.getQueryData<{ pages: TimelineWindow[] }>(historyKey)?.pages[0]?.items).toEqual(
     previous.pages[0]!.items,

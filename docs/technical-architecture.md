@@ -439,6 +439,14 @@ Basic presentation primitives live in `shared/ui`; incident domain badge variant
 
 The shared message-delivery hook owns coordinator instances in its effect and exposes a stable forwarding port. Development Strict Mode cleanup disposes the first instance immediately; replay creates a fresh instance for Timeline and Thread restoration. Actual unmount still aborts the owned instance, and the delivery algorithm, identity leases and reconciliation rules remain unchanged.
 
+## 48. Incident List presentation and navigation
+
+URL filters/sort still use the existing codec and identity-scoped cursor Query. One filter-control tree becomes a compact sticky bar beneath the shell header when its origin leaves view; Filters exposes the same dimensions, assignment and removable chips, while Sort stays visible. Native popovers retain focus on transition and stay within the viewport across scrolling/resizing. A measured reservation preserves the list position when controls compact; expansion is bounded and scrollable on short screens. Presentation state remains local, with no duplicate form or new server/client state owner.
+
+Rows retain their semantic stretched Next Link, native new-tab behavior and row focus outline. Active P1 has a soft critical tint and solid rail; active P2 a lighter high tint and dashed rail. Resolved rows use a calm neutral surface and regular title weight while retaining readable severity/lifecycle badges. Load more remains explicit, with existing loading/error/cursor behavior and a visible end-of-results message.
+
+The Phase 2 request explicitly supersedes the specification's redundant My Incidents primary-navigation entry without editing the accepted Product Specification. Assigned to me stays in filters and a palette shortcut. The legacy `/app/my-incidents` server route redirects to the fixed `/app/incidents` destination with assignment forced on; it preserves repeated/unknown query values as encoded data and drops the obsolete page cursor. The existing session gate still preserves anonymous return destinations. Timeline's existing callbacks now use compact secondary buttons labelled Load earlier events and Jump to latest; Room scrolling, virtualization and composer ownership remain unchanged.
+
 ## Public implementation references
 
 - [Next.js installation and current App Router tooling](https://nextjs.org/docs/app/getting-started/installation)

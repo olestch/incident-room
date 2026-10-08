@@ -22,5 +22,11 @@ test('secondary navigation and inbox summary remain stable without development q
     await navigateApp(page, name);
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
   }
+  await page.goto('/app/my-incidents?severity=P1&tracking=keep');
+  await expect(page).toHaveURL('/app/incidents?severity=P1&tracking=keep&assignedToMe=true');
+  await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
+  await page.reload();
+  await expect(page.getByRole('list', { name: 'Incidents', exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Assigned to me', exact: true })).toBeChecked();
   expect(errors).toEqual([]);
 });

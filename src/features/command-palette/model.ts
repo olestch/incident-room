@@ -20,8 +20,8 @@ export function commandRegistry(
     },
     {
       id: 'mine',
-      label: 'Go to My Incidents',
-      category: 'Navigation',
+      label: 'Show incidents assigned to me',
+      category: 'Incidents',
       destination: '/app/incidents?assignedToMe=true',
     },
     {

@@ -463,7 +463,9 @@ describe('safe command registry', () => {
   });
   it('filters local static commands independently of remote results', () => {
     const commands = commandRegistry('/app/search', new URLSearchParams(), true);
-    expect(filterCommands(commands, 'my incidents').map((command) => command.id)).toEqual(['mine']);
+    expect(filterCommands(commands, 'assigned to me').map((command) => command.id)).toEqual([
+      'mine',
+    ]);
     expect(filterCommands(commands, 'NOTIFICATIONS')[0]?.id).toBe('notifications');
   });
   it('accepts Ctrl and Cmd while refusing IME, editable, modal and modified conflicts', () => {

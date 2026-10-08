@@ -70,7 +70,6 @@ function IdentityShellContent({
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const commands = useCommands();
-  const search = useSearchParams();
   const unread = useShellUnread(identity.userId, identity.workspaceId);
   const demo = useAppSelector((snapshot) => snapshot.demo);
   const simulationActive = (Object.keys(defaultDemo) as (keyof typeof defaultDemo)[]).some(
@@ -97,7 +96,6 @@ function IdentityShellContent({
   const navigation = (
     <ShellNavigation
       pathname={pathname}
-      assigned={search.get('assignedToMe') === 'true'}
       unread={unread.data?.count}
       navigate={navigate}
       openDemo={() => {

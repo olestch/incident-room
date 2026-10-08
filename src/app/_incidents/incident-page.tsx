@@ -305,7 +305,7 @@ function IdentityIncidentPage({
   const rows = list.data?.pages.flatMap((page) => page.items) ?? [];
   const total = list.data?.pages[0]?.total;
   return (
-    <section aria-label="Incident list">
+    <section aria-label="Incident list" className="incident-list">
       <div className="discovery-header">
         <div>
           <h1 className="text-page font-semibold">Incidents</h1>
@@ -367,8 +367,11 @@ function IdentityIncidentPage({
               disabled={list.isFetching}
               onClick={() => void list.fetchNextPage()}
             >
-              Load more
+              {list.isFetchingNextPage ? 'Loading more incidents…' : 'Load more'}
             </Button>
+          )}
+          {rows.length > 0 && !list.hasNextPage && (
+            <p className="queue-end">All {total} matching incidents loaded.</p>
           )}
         </>
       )}

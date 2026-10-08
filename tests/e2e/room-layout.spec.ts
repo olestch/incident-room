@@ -98,7 +98,15 @@ test('composer grows within bounds and retains its draft across narrow, short an
       await expect.poll(async () => (await geometry(page)).compose.bottom <= height).toBe(true);
       const layout = await geometry(page);
       expect(layout.overflowX).toBe(false);
-      expect(layout.viewport.height).toBeGreaterThan(0);
+      expect(
+        layout.viewport.height,
+        JSON.stringify({
+          width,
+          height,
+          layout,
+          heading: await timeline(page).locator('.room-stream-heading').boundingBox(),
+        }),
+      ).toBeGreaterThan(0);
       expect((await field.boundingBox())!.height).toBeLessThanOrEqual(129);
       await expect(field).toHaveValue(body);
       await expect(
@@ -190,7 +198,7 @@ test('desktop Thread adapts the workspace without coupling scroll positions or l
   await expect(thread(page)).toHaveCount(0);
   await expect(stream).toBeFocused();
   await expect(timelineField).toHaveValue('Fictional Timeline draft remains separate.');
-  await timeline(page).getByRole('button', { name: 'Go to latest', exact: true }).click();
+  await timeline(page).getByRole('button', { name: 'Jump to latest', exact: true }).click();
   await page.getByRole('button', { name: `Open Thread for ${root}`, exact: true }).click();
   await expect(reply).toHaveValue('Fictional Thread draft remains separate.');
 });
