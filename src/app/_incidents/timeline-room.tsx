@@ -8,6 +8,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { RotateCcw } from 'lucide-react';
 import type { CurrentUser, WorkspaceUser } from '@/entities/current-user/model';
 import type { Incident } from '@/entities/incident/model';
 import { incidentKeys } from '@/entities/incident/model';
@@ -383,9 +384,37 @@ export function TimelineRoom({
       <section ref={timelineSection} aria-labelledby="timeline-heading" className="room-timeline">
         <div className="room-stream-heading">
           <h2 id="timeline-heading">Timeline</h2>
-          <button className="incident-button room-latest" onClick={goLatest}>
-            Go to latest
-          </button>
+          <div className="room-history-actions">
+            {target !== null && !highlight && !navigationStatus.startsWith('Locating') && (
+              <button
+                className="incident-button room-latest room-target-retry"
+                aria-label="Retry target"
+                title="Retry target"
+                onClick={() => setTargetAttempt((attempt) => attempt + 1)}
+              >
+                <RotateCcw size={16} aria-hidden="true" />
+              </button>
+            )}
+            {history.hasNextPage && (
+              <button
+                className="incident-button room-latest"
+                aria-label={
+                  history.isFetchingNextPage ? 'Loading older history…' : 'Load older history'
+                }
+                disabled={history.isFetching}
+                onClick={() => void history.fetchNextPage({ cancelRefetch: false })}
+              >
+                {history.isFetchingNextPage ? 'Loading…' : 'Load older'}
+              </button>
+            )}
+            <button
+              className="incident-button room-latest"
+              aria-label="Go to latest"
+              onClick={goLatest}
+            >
+              Latest
+            </button>
+          </div>
         </div>
         <RealtimeSummary
           status={realtime.status}
@@ -394,14 +423,10 @@ export function TimelineRoom({
           userId={actor.id}
           retry={realtime.retry}
         />
-        {navigationStatus && <p role="status">{navigationStatus}</p>}
-        {target !== null && !highlight && !navigationStatus.startsWith('Locating') && (
-          <button
-            className="incident-button"
-            onClick={() => setTargetAttempt((attempt) => attempt + 1)}
-          >
-            Retry target
-          </button>
+        {navigationStatus && (
+          <div className="room-navigation-feedback">
+            <p role="status">{navigationStatus}</p>
+          </div>
         )}
         {history.isPending && <p role="status">Loading Timeline…</p>}
         {history.isError && (
@@ -424,15 +449,6 @@ export function TimelineRoom({
               Retry history
             </button>
           </div>
-        )}
-        {history.hasNextPage && (
-          <button
-            className="incident-button my-2"
-            disabled={history.isFetching}
-            onClick={() => void history.fetchNextPage({ cancelRefetch: false })}
-          >
-            {history.isFetchingNextPage ? 'Loading older history…' : 'Load older history'}
-          </button>
         )}
         {history.data && !history.hasNextPage && (
           <p className="text-sm">Beginning of loaded history</p>

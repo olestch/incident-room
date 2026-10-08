@@ -1,22 +1,48 @@
 .incident-room {
   min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+.shell-content:has(> .incident-room) {
+  display: flex;
+  flex-direction: column;
+  height: calc(var(--room-viewport-height, 100dvh) - var(--shell-topbar-height));
+  min-height: 0;
+  padding-block: 0.75rem;
+}
+.shell-content:has(> .incident-room) > .shell-notices {
+  flex-shrink: 0;
+}
+.app-shell:has(.incident-room),
+.shell-grid:has(.incident-room) {
+  min-height: 0;
 }
 .incident-room .incident-room-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
-  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 0.75rem;
 }
-.incident-room .room-loading {
-  grid-column: 1 / -1;
+.room-context-panel {
+  flex: 0 0 auto;
+  min-height: 0;
+  min-width: 0;
+  max-height: 30%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 0.5rem 0.5rem 0;
+}
+.room-back {
+  font-size: var(--text-meta);
+  padding-inline: 0.5rem;
+  margin-left: -0.5rem;
 }
 .incident-command-strip {
-  padding: 1rem 0 1.25rem;
-  border-bottom: 1px solid var(--color-line);
+  padding: 0.25rem 0;
 }
 .room-identity,
-.room-command-metadata,
-.room-command-metadata > span,
 .room-person,
 .room-people li,
 .room-services,
@@ -36,7 +62,6 @@
   gap: 0.5rem;
 }
 .room-identity,
-.room-command-metadata,
 .room-services,
 .stream-transition,
 .stream-event-heading,
@@ -53,23 +78,11 @@
   margin-right: 0.25rem;
 }
 .incident-command-strip h1 {
-  font-size: var(--text-page);
-  line-height: var(--text-page--line-height);
+  font-size: var(--text-section);
+  line-height: 1.5;
   font-weight: 650;
   margin: 0.625rem 0;
   overflow-wrap: anywhere;
-}
-.room-command-metadata {
-  gap: 0.5rem 1.25rem;
-  color: var(--color-muted);
-  font-size: var(--text-meta);
-}
-.room-command-metadata > span {
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
-.room-command-metadata svg {
-  flex-shrink: 0;
 }
 .room-context-rail {
   min-width: 0;
@@ -122,14 +135,47 @@
 }
 .room-timeline {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-panel);
 }
+.room-timeline > :not(.timeline-viewport),
+.thread-surface > :not(.timeline-viewport):not(.thread-root) {
+  flex-shrink: 0;
+}
+.incident-room .thread-room-layout {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 .room-stream-heading {
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.25rem 0.75rem;
   border-bottom: 1px solid var(--color-line);
+}
+.room-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+.room-target-retry,
+.thread-commands {
+  min-width: 2.75rem;
+  justify-content: center;
+}
+.thread-history-toolbar {
+  padding: 0.25rem 0.75rem;
+}
+.room-navigation-feedback {
+  padding: 0.25rem 0.75rem;
+  font-size: var(--text-meta);
 }
 .room-stream-heading h2 {
   display: flex;
@@ -154,7 +200,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
-  padding: 0.625rem 1rem;
+  padding: 0.25rem 0.75rem;
   font-size: var(--text-meta);
   color: var(--color-muted);
   border-bottom: 1px solid var(--color-line);
@@ -204,8 +250,10 @@
 .incident-room .timeline-viewport {
   border: 0;
   border-radius: 0;
-  height: min(58dvh, 46rem);
-  min-height: 12rem;
+  flex: 1 1 0%;
+  height: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 .incident-room .timeline-row {
   padding: 0;
@@ -372,26 +420,26 @@
   min-height: 1.5rem;
   padding: 0.25rem 1rem;
 }
+.room-typing:empty {
+  display: none;
+}
 .incident-room .timeline-compose {
-  padding: 0.75rem 1rem max(1rem, env(safe-area-inset-bottom));
+  padding: 0.5rem 0.75rem max(0.5rem, env(safe-area-inset-bottom));
   border-top: 1px solid var(--color-line);
   background: var(--color-surface-secondary);
 }
-.compose-label {
-  display: block;
-  font-size: var(--text-control);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
 .compose-editor {
   font-size: var(--text-body);
-  resize: vertical;
+  resize: none;
+  min-height: 2.75rem;
+  max-height: min(8rem, 20dvh);
+  overflow-y: auto;
   line-height: 1.5;
 }
 .compose-help {
   font-size: var(--text-time);
   color: var(--color-muted);
-  margin: 0.5rem 0;
+  margin: 0.25rem 0;
 }
 .compose-actions {
   gap: 0.25rem 0.5rem;
@@ -405,6 +453,9 @@
 .compose-draft {
   color: var(--color-muted);
   font-size: var(--text-time);
+}
+.compose-draft:empty {
+  display: none;
 }
 .mention-picker {
   position: fixed;
@@ -438,7 +489,9 @@
   border-radius: var(--radius-panel);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .incident-room .thread-surface > p,
 .incident-room .thread-surface > div[role='alert'],
@@ -453,8 +506,8 @@
 .incident-room .thread-root {
   margin: 0 1rem;
   padding: 0.5rem 0 0.75rem;
-  max-height: 12rem;
-  flex-shrink: 0;
+  max-height: min(16dvh, 9rem);
+  flex-shrink: 1;
   border-bottom: 1px solid var(--color-line);
 }
 .thread-root-label {
@@ -478,7 +531,8 @@
   margin-top: 0.25rem;
 }
 .incident-room .thread-surface .timeline-viewport {
-  height: min(43dvh, 34rem);
+  height: auto;
+  min-height: 0;
 }
 .thread-message,
 .thread-surface .stream-local {
@@ -507,57 +561,123 @@
 }
 @media (min-width: 64rem) {
   .incident-room .incident-room-layout {
+    display: grid;
     grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr);
-    gap: 1rem 1.5rem;
-    align-items: start;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  .room-context-panel {
+    max-height: none;
+    height: 100%;
+    padding-right: 0.75rem;
+    border-right: 1px solid var(--color-line);
   }
   .incident-room .incident-room-layout:has(.thread-room-open) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .incident-room .incident-room-layout:has(.thread-room-open) .room-context-content {
-    max-width: 54rem;
+    grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr);
   }
   .incident-room .thread-room-open {
     display: grid;
-    grid-template-columns: minmax(0, 1.55fr) minmax(20rem, 1fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
     gap: 1rem;
-    align-items: start;
+    align-items: stretch;
   }
 }
 @media (max-width: 63.99rem) {
+  .room-back {
+    float: left;
+    margin: 0 0.375rem 0 0;
+    padding: 0.5rem;
+    width: 2.75rem;
+  }
+  .room-back-label {
+    display: none;
+  }
+  .room-identity {
+    min-height: 2.75rem;
+  }
+  .incident-command-strip h1 {
+    clear: both;
+  }
   body:has(.incident-room .thread-surface) {
     overflow: hidden;
   }
   .incident-command-strip h1 {
-    font-size: 1.5rem;
-    line-height: 1.875rem;
+    font-size: 1.125rem;
+    line-height: 1.5rem;
   }
   .incident-room .thread-surface {
     inset: 0;
     z-index: 40;
     border-radius: 0;
     padding-top: env(safe-area-inset-top);
-    height: 100dvh;
-    overflow-y: auto;
+    height: var(--room-viewport-height, 100dvh);
+    max-height: var(--room-viewport-height, 100dvh);
+    overflow: hidden;
   }
   .incident-room .thread-surface .timeline-viewport {
-    flex: 1 0 8rem;
+    flex: 1 1 0%;
     height: auto;
-    min-height: 8rem;
+    min-height: 0;
   }
   .incident-room .thread-surface .timeline-compose {
     flex-shrink: 0;
   }
   .incident-room .thread-root {
-    max-height: 9rem;
+    max-height: min(16dvh, 7rem);
   }
   .incident-room .thread-surface .compose-editor {
     max-height: 8rem;
   }
 }
+@media (max-height: 32rem) {
+  .shell-content:has(> .incident-room) {
+    padding-block: 0.25rem;
+  }
+  .incident-room .incident-room-layout {
+    gap: 0.25rem;
+  }
+  .incident-room .room-realtime {
+    padding-block: 0;
+  }
+  .incident-room .room-realtime summary,
+  .incident-room .room-realtime .room-connection {
+    min-height: 1.5rem;
+  }
+  .incident-room .room-stream-heading {
+    padding-block: 0;
+  }
+  .incident-room .compose-editor {
+    max-height: 4rem;
+  }
+  .incident-room .compose-help,
+  .incident-room .compose-draft {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .shell-sidebar:has(+ .shell-content > .incident-room) {
+    overflow-y: auto;
+  }
+  .shell-sidebar:has(+ .shell-content > .incident-room) .shell-navigation {
+    height: auto;
+    min-height: 100%;
+  }
+}
+@media (max-width: 63.99rem) and (max-height: 32rem) {
+  .room-context-panel {
+    max-height: 2.75rem;
+    padding-block: 0;
+  }
+}
 @media (max-width: 30rem) {
-  .room-command-metadata {
-    gap: 0.5rem;
+  .compose-mention-label,
+  .compose-shortcuts {
+    display: none;
   }
   .chronology-event {
     grid-template-columns: 1.875rem minmax(0, 1fr);

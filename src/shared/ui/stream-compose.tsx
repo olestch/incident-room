@@ -1,5 +1,5 @@
 'use client';
-import { useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { AtSign, Send, X } from 'lucide-react';
 import { Button, InlineAlert } from './primitives';
 import { messageBodySchema } from '@/shared/messaging/model';
@@ -32,6 +32,25 @@ export function StreamCompose({
   const mentionId = useId();
   const editor = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLDivElement>(null);
+  const fitEditor = useCallback(() => {
+    const field = editor.current;
+    if (!field) return;
+    field.style.height = '0px';
+    field.style.height = `${field.scrollHeight}px`;
+  }, []);
+  useLayoutEffect(() => fitEditor(), [body, writable, fitEditor]);
+  useEffect(() => {
+    const field = editor.current;
+    if (!field) return;
+    let width = field.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (width === field.clientWidth) return;
+      width = field.clientWidth;
+      fitEditor();
+    });
+    observer.observe(field);
+    return () => observer.disconnect();
+  }, [writable, fitEditor]);
   const submit = () => {
     const result = messageBodySchema.safeParse(body);
     if (!result.success) {
@@ -58,14 +77,15 @@ export function StreamCompose({
         submit();
       }}
     >
-      <label htmlFor={`${label}-body`} className="compose-label">
+      <label htmlFor={`${label}-body`} className="sr-only">
         Message
       </label>
       <textarea
         ref={editor}
         id={`${label}-body`}
         className="incident-input compose-editor"
-        rows={3}
+        rows={1}
+        placeholder={label === 'Timeline' ? 'Write an incident update…' : 'Write a Thread reply…'}
         maxLength={4000}
         value={body}
         disabled={!ready || busy}
@@ -87,15 +107,21 @@ export function StreamCompose({
         }}
       />
       <p id={`${label}-compose-help`} className="compose-help">
-        Plain text · {body.length}/4,000 · Enter: newline · Ctrl/Cmd+Enter: Send
+        Plain text · {body.length}/4,000
+        <span className="compose-shortcuts"> · Enter: newline · Ctrl/Cmd+Enter: Send</span>
       </p>
       <div id={`${label}-compose-error`}>
         {(validation || issue) && <InlineAlert>{validation ?? issue}</InlineAlert>}
       </div>
       <div className="compose-actions">
-        <Button variant="quiet" popoverTarget={mentionId} disabled={!ready || busy}>
+        <Button
+          variant="quiet"
+          aria-label="Mention"
+          popoverTarget={mentionId}
+          disabled={!ready || busy}
+        >
           <AtSign size={16} aria-hidden="true" />
-          Mention
+          <span className="compose-mention-label">Mention</span>
         </Button>
         <Button variant="quiet" disabled={!ready || busy || !body} onClick={discard}>
           Discard draft

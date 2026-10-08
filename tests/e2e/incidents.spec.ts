@@ -159,12 +159,17 @@ test('create validates, preserves state on resize, navigates to real detail and 
     page.getByRole('heading', { name: /INC-2873.*Fictional routing degradation/ }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: /INC-2873/ })).toBeFocused();
-  await expect(page.getByLabel('Incident detail')).toContainText('Commander: Sage Linden');
-  await expect(page.getByLabel('Incident detail')).toContainText('2 participants');
   const context = page.getByRole('complementary', { name: 'Incident context', exact: true });
   await expect(context).toContainText('Participants · 2');
   if (!(await context.getByRole('list').isVisible()))
     await context.getByText('Incident context', { exact: true }).click();
+  await expect(
+    context
+      .locator('dt')
+      .filter({ hasText: /^Commander$/ })
+      .locator('+ dd'),
+  ).toContainText('Sage Linden');
+  await expect(context.getByRole('list').getByRole('listitem')).toHaveCount(2);
   await expect(context.getByRole('list')).toContainText('Sage Linden');
   await expect(context.getByRole('list')).toContainText('River Vale');
   await expect(page.getByLabel('Incident detail')).toContainText('Triggered');

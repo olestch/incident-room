@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Users, Layers, Crown, Clock } from 'lucide-react';
 import type { WorkspaceUser } from '@/entities/current-user/model';
 import { services, type Incident } from '@/entities/incident/model';
 import { SeverityBadge, LifecycleBadge } from '@/entities/incident/badges';
@@ -8,9 +7,7 @@ import { Avatar } from '@/shared/ui/primitives';
 import { IncidentTime } from './views';
 
 type RoomProps = { incident: Incident; users: WorkspaceUser[] };
-export function IncidentCommandStrip({ incident, users }: RoomProps) {
-  const commander =
-    users.find((user) => user.id === incident.commanderId)?.name ?? 'Workspace member';
+export function IncidentCommandStrip({ incident }: RoomProps) {
   return (
     <header className="incident-command-strip">
       <div className="room-identity">
@@ -22,26 +19,6 @@ export function IncidentCommandStrip({ incident, users }: RoomProps) {
         <span className="sr-only">{incident.number} · </span>
         {incident.title}
       </h1>
-      <div className="room-command-metadata">
-        <span>
-          <Layers size={15} aria-hidden="true" />
-          {incident.serviceIds
-            .map((id) => services.find((s) => s.id === id)?.label ?? id)
-            .join(', ') || 'No services selected'}
-        </span>
-        <span>
-          <Crown size={15} aria-hidden="true" />
-          Commander: {commander}
-        </span>
-        <span>
-          <Users size={15} aria-hidden="true" />
-          {incident.participantIds.length} participants
-        </span>
-        <span>
-          <Clock size={15} aria-hidden="true" />
-          Updated <IncidentTime value={incident.updatedAt} />
-        </span>
-      </div>
     </header>
   );
 }
@@ -49,19 +26,18 @@ export function IncidentCommandStrip({ incident, users }: RoomProps) {
 export function IncidentDetails({
   incident,
   users,
-  threadOpen,
   children,
-}: RoomProps & { threadOpen: boolean; children?: ReactNode }) {
+}: RoomProps & { children?: ReactNode }) {
   const name = (id: string) =>
     users.find((user) => user.id === id)?.name ?? 'Unavailable workspace user';
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     const media = window.matchMedia('(min-width: 64rem)');
-    const sync = () => setExpanded(media.matches && !threadOpen);
+    const sync = () => setExpanded(media.matches);
     sync();
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
-  }, [threadOpen]);
+  }, []);
   return (
     <aside className="room-context-rail" aria-label="Incident context">
       <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
@@ -94,6 +70,10 @@ export function IncidentDetails({
             <dt>Created</dt>
             <dd>
               <IncidentTime value={incident.createdAt} />
+            </dd>
+            <dt>Updated</dt>
+            <dd>
+              <IncidentTime value={incident.updatedAt} />
             </dd>
             {incident.resolvedAt && (
               <>

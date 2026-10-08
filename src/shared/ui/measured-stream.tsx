@@ -189,6 +189,21 @@ export const MeasuredStream = forwardRef<
         className="timeline-viewport"
         tabIndex={0}
         aria-label={`${label} viewport`}
+        onKeyDown={(event) => {
+          if (
+            event.target !== event.currentTarget ||
+            event.altKey ||
+            event.metaKey ||
+            event.ctrlKey
+          )
+            return;
+          if (event.key !== 'Home' && event.key !== 'End') return;
+          event.preventDefault();
+          // Let the virtualizer reconcile variable heights after an explicit keyboard jump.
+          widthAnchor.current = null;
+          if (event.key === 'Home') virtual.scrollToIndex(0, { align: 'start', behavior: 'auto' });
+          else virtual.scrollToEnd({ behavior: 'auto' });
+        }}
         onScroll={() => {
           settle();
           const node = container.current;

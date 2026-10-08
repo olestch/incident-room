@@ -37,7 +37,7 @@ import { StreamCompose } from '@/shared/ui/stream-compose';
 import { AppError } from '@/shared/errors/app-error';
 import { useLocalWork, useSessionRuntime } from '@/app/_providers/session-provider';
 import { ThreadRootPreview } from '@/features/timeline/views';
-import { MessageSquare, X, Radio, WifiOff } from 'lucide-react';
+import { MessageSquare, X, Radio, WifiOff, Command, RotateCcw } from 'lucide-react';
 import type { ActiveThreadPort } from './use-room-realtime';
 import { hasAcquiredThreadMessage } from './thread-cache';
 
@@ -465,8 +465,13 @@ export function ThreadSurface({
           Thread
         </h2>
         {appCommands && (
-          <button className="incident-button lg:hidden" onClick={() => appCommands.openPalette()}>
-            Thread commands
+          <button
+            className="incident-button thread-commands lg:hidden"
+            aria-label="Thread commands"
+            title="Thread commands"
+            onClick={() => appCommands.openPalette()}
+          >
+            <Command size={16} aria-hidden="true" />
           </button>
         )}
         <button
@@ -562,25 +567,39 @@ export function ThreadSurface({
       {history.isSuccess && !rows.length && (
         <p>No replies yet. The first reply creates this Thread.</p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <button className="incident-button" onClick={goLatest}>
-          Latest replies
+      <div className="room-history-actions thread-history-toolbar">
+        <button
+          className="incident-button room-latest"
+          aria-label="Latest replies"
+          onClick={goLatest}
+        >
+          Latest
         </button>
         {history.hasNextPage && (
           <button
-            className="incident-button"
+            className="incident-button room-latest"
+            aria-label="Load older replies"
             disabled={history.isFetching}
             onClick={() => void history.fetchNextPage({ cancelRefetch: false })}
           >
-            Load older replies
+            Load older
+          </button>
+        )}
+        {target !== null && !highlight && !navigationStatus.startsWith('Locating') && (
+          <button
+            className="incident-button room-latest room-target-retry"
+            aria-label="Retry message target"
+            title="Retry message target"
+            onClick={() => setTargetAttempt((value) => value + 1)}
+          >
+            <RotateCcw size={16} aria-hidden="true" />
           </button>
         )}
       </div>
-      {navigationStatus && <p role="status">{navigationStatus}</p>}
-      {target !== null && !highlight && !navigationStatus.startsWith('Locating') && (
-        <button className="incident-button" onClick={() => setTargetAttempt((value) => value + 1)}>
-          Retry message target
-        </button>
+      {navigationStatus && (
+        <div className="room-navigation-feedback">
+          <p role="status">{navigationStatus}</p>
+        </div>
       )}
       <MeasuredStream
         ref={viewport}

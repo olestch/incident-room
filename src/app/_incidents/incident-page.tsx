@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { Plus, ListFilter } from 'lucide-react';
+import { Plus, ListFilter, ArrowLeft } from 'lucide-react';
 import { Button, InlineAlert } from '@/shared/ui/primitives';
 import { IncidentQueueRow, IncidentQueueSkeleton } from '@/features/incident-management/queue-row';
 import { useEffect, useState } from 'react';
@@ -197,6 +197,20 @@ function IdentityIncidentPage({
   });
   const hasContext = !!detail.data && !!users.data;
   useEffect(() => {
+    if (!number) return;
+    const content = document.getElementById('main-content');
+    const viewport = window.visualViewport;
+    if (!content || !viewport) return;
+    const update = () =>
+      content.style.setProperty('--room-viewport-height', `${viewport.height}px`);
+    update();
+    viewport.addEventListener('resize', update);
+    return () => {
+      viewport.removeEventListener('resize', update);
+      content.style.removeProperty('--room-viewport-height');
+    };
+  }, [number]);
+  useEffect(() => {
     if (number && hasContext) document.getElementById('incident-heading')?.focus();
   }, [number, hasContext]);
   const errorView = (error: Error, retry: () => void) => (
@@ -221,37 +235,44 @@ function IdentityIncidentPage({
   if (number)
     return (
       <section aria-label="Incident detail" className="incident-room">
-        <Link className="underline" href="/app/incidents">
-          Back to incidents
-        </Link>
         <div className="incident-room-layout">
-          <div className="room-loading">
-            {(detail.isPending || (detail.data && users.isPending)) && (
-              <p role="status">Loading incident…</p>
-            )}
-            {detail.isError && errorView(detail.error, () => void detail.refetch())}
-            {users.isError && errorView(users.error, () => void users.refetch())}
+          <div
+            className="room-context-panel"
+            role="region"
+            tabIndex={0}
+            aria-label="Incident context panel"
+          >
+            <Link
+              className="ui-button ui-button-quiet room-back"
+              href="/app/incidents"
+              aria-label="Back to incidents"
+              title="Back to incidents"
+            >
+              <ArrowLeft size={16} aria-hidden="true" />{' '}
+              <span className="room-back-label">Back to incidents</span>
+            </Link>
+            <div className="room-loading">
+              {(detail.isPending || (detail.data && users.isPending)) && (
+                <p role="status">Loading incident…</p>
+              )}
+              {detail.isError && errorView(detail.error, () => void detail.refetch())}
+              {users.isError && errorView(users.error, () => void users.refetch())}
+              {detail.data &&
+                users.data &&
+                !inaccessible(detail.error) &&
+                !inaccessible(users.error) && (
+                  <IncidentCommandStrip incident={detail.data} users={users.data} />
+                )}
+            </div>
             {detail.data &&
               users.data &&
               !inaccessible(detail.error) &&
               !inaccessible(users.error) && (
-                <>
-                  <IncidentCommandStrip incident={detail.data} users={users.data} />
-                </>
+                <IncidentDetails incident={detail.data} users={users.data}>
+                  {current.data && <PostmortemEntry incident={detail.data} actor={current.data} />}
+                </IncidentDetails>
               )}
           </div>
-          {detail.data &&
-            users.data &&
-            !inaccessible(detail.error) &&
-            !inaccessible(users.error) && (
-              <IncidentDetails
-                incident={detail.data}
-                users={users.data}
-                threadOpen={params.get('thread') !== null}
-              >
-                {current.data && <PostmortemEntry incident={detail.data} actor={current.data} />}
-              </IncidentDetails>
-            )}
           {detail.data &&
             users.data &&
             current.data &&
