@@ -78,9 +78,12 @@ export const MeasuredStream = forwardRef<
     followOnAppend: targetActive ? false : 'auto',
     scrollEndThreshold: 96,
   });
-  // Measured content above the reading anchor must compensate even after backward scrolling.
-  virtual.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) =>
-    item.end <= (instance.scrollOffset ?? 0);
+  // First measurements replace an estimated block above the fold, including the
+  // partially visible row. Later growth only compensates rows fully above it.
+  virtual.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
+    const offset = (instance.scrollOffset ?? 0) + instance.scrollAdjustments;
+    return instance.itemSizeCache.has(item.key) ? item.end <= offset : item.start < offset;
+  };
   const settle = useCallback(() => {
     const task = pending.current;
     if (!task || task.signal.aborted) return;
