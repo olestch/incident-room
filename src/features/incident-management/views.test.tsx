@@ -190,8 +190,11 @@ it('guards unresolved submission and dirty close, restoring focus after unmount'
     <CreateIncidentDialog users={users} creatorId="demo-sage" close={close} submit={submit} />,
   );
   await user.type(screen.getByLabelText('Title (required)'), 'A draft');
-  vi.spyOn(window, 'confirm').mockReturnValue(false);
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('dialog', { name: 'Discard incident draft?' })).toHaveTextContent(
+    'has not been created',
+  );
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }));
   expect(close).not.toHaveBeenCalled();
   await user.selectOptions(screen.getByLabelText('Severity (required)'), 'P1');
   await user.dblClick(screen.getByRole('button', { name: 'Create Incident' }));
@@ -200,4 +203,27 @@ it('guards unresolved submission and dirty close, restoring focus after unmount'
   view.unmount();
   expect(trigger).toHaveFocus();
   trigger.remove();
+});
+
+it('ignores blank draft changes, warns on meaningful unload, and does not discard before a decision', async () => {
+  const user = userEvent.setup(),
+    close = vi.fn();
+  render(
+    <CreateIncidentDialog users={users} creatorId="demo-river" close={close} submit={vi.fn()} />,
+  );
+  await user.type(screen.getByLabelText('Title (required)'), '   ');
+  const blankUnload = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(blankUnload);
+  expect(blankUnload.defaultPrevented).toBe(false);
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(close).toHaveBeenCalledOnce();
+  await user.type(screen.getByLabelText('Title (required)'), 'Meaningful draft');
+  const unload = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(unload);
+  expect(unload.defaultPrevented).toBe(true);
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(close).toHaveBeenCalledOnce();
+  expect(screen.getByLabelText('Title (required)')).toHaveValue('   Meaningful draft');
+  await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+  expect(close).toHaveBeenCalledTimes(2);
 });

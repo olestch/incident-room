@@ -131,11 +131,11 @@ test('dirty editor survives remote update; stale save conflicts and reload retai
   await expect(second.getByLabel('Summary', { exact: true })).toHaveValue('Newer server analysis.');
   await page.getByRole('button', { name: 'Review latest', exact: true }).click();
   await expect(page.getByLabel('Latest server version')).toContainText('Newer server analysis.');
-  page.once('dialog', (dialog) => dialog.dismiss());
   await page.getByRole('button', { name: 'Reload latest', exact: true }).click();
+  await page.getByRole('button', { name: 'Keep editing', exact: true }).click();
   await expect(page.getByLabel('Summary', { exact: true })).toHaveValue('Local unsaved analysis.');
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Reload latest', exact: true }).click();
+  await page.getByRole('button', { name: 'Replace fields', exact: true }).click();
   await expect(page.getByLabel('Summary', { exact: true })).toHaveValue('Newer server analysis.');
   await page.getByText('Retained local reference (not saved)').click();
   await expect(page.getByText('Local unsaved analysis.', { exact: true })).toBeVisible();
@@ -188,8 +188,8 @@ test('Action Item realtime updates converge once and stale item update cannot ov
   await expect(
     other.getByText('A newer Action Item revision exists. Your local edits were not saved.'),
   ).toBeVisible();
-  second.once('dialog', (dialog) => dialog.accept());
   await other.getByRole('button', { name: 'Reload latest', exact: true }).click();
+  await second.getByRole('button', { name: 'Replace fields', exact: true }).click();
   await expect(other.getByLabel('Action status', { exact: true })).toHaveValue('done');
   await expect(second.getByRole('form', { name: /^Edit Action Item/ })).toHaveCount(1);
 });
@@ -298,7 +298,10 @@ test('assignment notification links to canonical Postmortem and does not spam on
   await expect(item.getByText('Saved.', { exact: true })).toBeVisible();
   await navigateApp(second, 'Notifications');
   const inbox = second.getByRole('list', { name: 'Notifications', exact: true });
-  await expect(inbox.getByRole('listitem')).toHaveCount(2);
+  await expect(inbox.getByRole('listitem')).toHaveCount(6);
+  await expect(
+    inbox.getByRole('link', { name: `${number}: Action Item assigned to you`, exact: true }),
+  ).toHaveCount(1);
   await inbox
     .getByRole('link', { name: `${number}: Action Item assigned to you`, exact: true })
     .click();
@@ -314,21 +317,21 @@ test('dirty local navigation and palette respect confirmation; no horizontal ove
 }) => {
   await initiate(page);
   await page.getByLabel('Summary', { exact: true }).fill('Unsaved navigation evidence.');
-  page.once('dialog', (dialog) => dialog.dismiss());
   await page.getByRole('link', { name: 'Back to Incident Room', exact: true }).click();
+  await page.getByRole('button', { name: 'Keep editing', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${number}/postmortem$`));
   await expect(page.getByLabel('Summary', { exact: true })).toHaveValue(
     'Unsaved navigation evidence.',
   );
   await page.getByRole('button', { name: 'Commands', exact: true }).click();
-  page.once('dialog', (dialog) => dialog.dismiss());
   await page.getByRole('option', { name: /Go to Incidents/ }).click();
+  await page.getByRole('button', { name: 'Keep editing', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${number}/postmortem$`));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('link', { name: 'Back to Incident Room', exact: true }).click();
+  await page.getByRole('button', { name: 'Discard changes', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${number}$`));
 });
 
@@ -400,4 +403,28 @@ test('secondary surfaces and palette fit supported widths and system contrast pr
   );
   await input.press('Escape');
   await expect(page.getByRole('button', { name: 'Commands', exact: true })).toBeFocused();
+});
+
+test('deferred mobile navigation keeps unsaved review on cancel and closes the drawer after confirmed departure', async ({
+  page,
+}) => {
+  await initiate(page);
+  await page
+    .getByLabel('Summary', { exact: true })
+    .fill('Retained review through mobile navigation');
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  const navigation = page.getByRole('dialog', { name: 'Navigation', exact: true });
+  const link = navigation.getByRole('link', { name: 'Incidents', exact: true });
+  await link.press('Enter');
+  await page.keyboard.press('Escape');
+  await expect(link).toBeFocused();
+  await expect(page.getByLabel('Summary', { exact: true })).toHaveValue(
+    'Retained review through mobile navigation',
+  );
+  await link.press('Enter');
+  await page.getByRole('button', { name: 'Discard changes', exact: true }).click();
+  await expect(page).toHaveURL('/app/incidents');
+  await expect(navigation).toHaveCount(0);
+  await expect(page.getByRole('list', { name: 'Incidents', exact: true })).toBeVisible();
 });

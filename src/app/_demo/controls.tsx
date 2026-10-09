@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { ConfirmationDialog } from '@/shared/ui/confirmation';
 import { z } from 'zod';
 import { demoConfigured, demoSchema, defaultDemo, type DemoConfig } from '@/features/demo/model';
 import { useAppDispatch, useAppSelector } from '@/app/_providers/hooks';
 import { useSessionRuntime } from '@/app/_providers/session-provider';
-import { AppError } from '@/shared/errors/app-error';
 import { configureDemo, resetDemoConfig } from './runtime';
 import { exclusiveDemoMaintenance, clearDemoStores } from './reset';
 import { forgetFictionalClient, fictionalClientId } from '@/features/session/mock/browser';
@@ -16,6 +16,9 @@ export function DemoControls() {
   const { coordinator, adapter } = useSessionRuntime();
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [maintenance, setMaintenance] = useState<'dataset' | 'reset' | null>(null);
+  const [maintenanceError, setMaintenanceError] = useState<string>();
+  const operationPending = useRef(false);
   const change = (patch: Partial<DemoConfig>) => {
     const next = demoSchema.parse({ ...config, ...patch });
     configureDemo(next);
@@ -23,20 +26,64 @@ export function DemoControls() {
     setFeedback('Demo configuration applied. Fault schedule restarted.');
   };
   const run = async (operation: () => Promise<void>) => {
+    if (operationPending.current) return false;
+    operationPending.current = true;
     setPending(true);
     setFeedback('Applying demo operation…');
     try {
       await operation();
+      return true;
     } catch (error) {
-      setFeedback(
-        `Demo operation unavailable. ${error instanceof AppError ? error.message : 'Check browser storage/connection, reload and retry maintenance before trusting partial state.'}`,
-      );
+      const message = `Demo operation unavailable. ${error instanceof Error ? error.message : 'Check browser storage/connection, reload and retry maintenance before trusting partial state.'}`;
+      if (maintenance) {
+        setMaintenanceError(message);
+        setFeedback('');
+      } else setFeedback(message);
+      return false;
     } finally {
+      operationPending.current = false;
       setPending(false);
     }
   };
   return (
     <div>
+      {maintenance && (
+        <ConfirmationDialog
+          open
+          title={maintenance === 'dataset' ? 'Replace showcase dataset?' : 'Reset Demo data?'}
+          description={
+            maintenance === 'dataset'
+              ? 'Replace INC-2841 Timeline and clear its Threads, local work and activity journal. Other Incident data remains. Close other app tabs first.'
+              : 'Remove all fictional accounts, incidents, messages, notifications, Postmortems, drafts and outbox on this origin. You will sign in again; the fictional baseline will be restored. Close other app tabs first.'
+          }
+          confirmLabel={maintenance === 'dataset' ? 'Replace dataset' : 'Reset Demo data'}
+          destructive
+          busy={pending}
+          error={maintenanceError}
+          cancel={() => {
+            if (!operationPending.current) setMaintenance(null);
+          }}
+          confirm={() =>
+            void run(async () => {
+              setMaintenanceError(undefined);
+              const demoRuntime = await import('@/app/_mocks/browser');
+              if (maintenance === 'dataset') {
+                await demoRuntime.replaceDemoDataset(config.datasetSize, () =>
+                  coordinator.dispose(),
+                );
+                window.location.replace('/app/incidents/INC-2841');
+              } else {
+                await exclusiveDemoMaintenance(async () => {
+                  await demoRuntime.quiesceDemo(() => coordinator.dispose());
+                  await clearDemoStores();
+                  forgetFictionalClient(fictionalClientId());
+                });
+                window.location.replace('/login');
+              }
+            })
+          }
+        />
+      )}
       <p className="type-meta mb-5">
         Faults affect ordinary reads/mutations before persistence, not authentication or realtime
         polling. Never enter real data.
@@ -156,19 +203,8 @@ export function DemoControls() {
           </label>
           <Button
             onClick={() => {
-              if (
-                !window.confirm(
-                  'Replace INC-2841 Timeline and clear its Threads, local work and activity journal? Close other app tabs. Other Incident data remains.',
-                )
-              )
-                return;
-              void run(async () => {
-                const demoRuntime = await import('@/app/_mocks/browser');
-                await demoRuntime.replaceDemoDataset(config.datasetSize, () =>
-                  coordinator.dispose(),
-                );
-                window.location.replace('/app/incidents/INC-2841');
-              });
+              setMaintenanceError(undefined);
+              setMaintenance('dataset');
             }}
           >
             Replace showcase dataset
@@ -198,21 +234,8 @@ export function DemoControls() {
           <Button
             variant="danger"
             onClick={() => {
-              if (
-                !window.confirm(
-                  'Reset ALL fictional accounts, incidents, messages, notifications, Postmortems, drafts and outbox on this origin? Close other app tabs. You will sign in again.',
-                )
-              )
-                return;
-              void run(async () => {
-                const demoRuntime = await import('@/app/_mocks/browser');
-                await exclusiveDemoMaintenance(async () => {
-                  await demoRuntime.quiesceDemo(() => coordinator.dispose());
-                  await clearDemoStores();
-                  forgetFictionalClient(fictionalClientId());
-                });
-                window.location.replace('/login');
-              });
+              setMaintenanceError(undefined);
+              setMaintenance('reset');
             }}
           >
             Reset Demo data

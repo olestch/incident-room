@@ -59,7 +59,10 @@ export function NotificationInbox({
         <p>
           <UnreadBadge count={unreadCount} /> <span aria-hidden="true">unread</span>
         </p>
-        <Button disabled={busy || loading} onClick={markAll}>
+        <Button
+          disabled={busy || loading || unreadCount === undefined || unreadCount === 0}
+          onClick={markAll}
+        >
           <CheckCheck size={17} aria-hidden="true" />
           Mark all as read
         </Button>
@@ -76,7 +79,10 @@ export function NotificationInbox({
         {loading && <RowSkeletons label="Loading Notifications…" />}
         {!items.length && !error && !loading && (
           <EmptyState icon={Bell} title="You are caught up">
-            <p>No notifications.</p>
+            <p>
+              No assignments, mentions or replies yet. New activity for your account will appear
+              here.
+            </p>
           </EmptyState>
         )}
         <ul aria-label="Notifications" className="notification-list">

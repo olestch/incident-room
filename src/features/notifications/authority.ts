@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { withDemoNotificationFixtures } from './demo-fixtures';
 import {
   notificationSchema,
   notificationChangeSchema,
@@ -11,6 +12,7 @@ import { createDiagnostics } from '@/shared/diagnostics/diagnostics';
 
 export const notificationAuthoritySchema = z.object({
   items: z.array(notificationSchema),
+  demoFixtureVersion: z.number().int().nonnegative().default(0),
   receipts: z.record(z.string(), z.boolean()),
   revisions: z.record(z.string(), z.number().int().nonnegative()),
   changes: z.array(notificationChangeSchema),
@@ -20,6 +22,7 @@ export const notificationAuthoritySchema = z.object({
 export type NotificationData = z.infer<typeof notificationAuthoritySchema>;
 export const seedNotifications = (): NotificationData => ({
   items: [],
+  demoFixtureVersion: 0,
   receipts: {},
   revisions: {},
   changes: [],
@@ -27,8 +30,10 @@ export const seedNotifications = (): NotificationData => ({
   failOnce: false,
 });
 export const makeNotificationStore = () =>
-  new IndexedDbAtomicStore('incident-room-fictional-notifications-v1', seedNotifications, (raw) =>
-    notificationAuthoritySchema.parse(raw),
+  withDemoNotificationFixtures(
+    new IndexedDbAtomicStore('incident-room-fictional-notifications-v1', seedNotifications, (raw) =>
+      notificationAuthoritySchema.parse(raw),
+    ),
   );
 export type NotificationActor = {
   id: string;

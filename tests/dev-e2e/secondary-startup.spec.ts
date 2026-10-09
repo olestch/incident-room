@@ -14,10 +14,10 @@ test('secondary navigation and inbox summary remain stable without development q
   await expect(page.getByLabel('Current user')).toContainText('River Vale');
   await navigateApp(page, 'Notifications');
   await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
-  await expect(page.locator('main').getByLabel('0 unread notifications')).toHaveText('0');
+  await expect(page.locator('main').getByLabel('1 unread notifications')).toHaveText('1');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
-  await expect(page.locator('main').getByLabel('0 unread notifications')).toHaveText('0');
+  await expect(page.locator('main').getByLabel('1 unread notifications')).toHaveText('1');
   for (const name of ['Search', 'Team', 'Settings']) {
     await navigateApp(page, name);
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();

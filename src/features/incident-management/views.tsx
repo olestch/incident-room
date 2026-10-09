@@ -1,10 +1,11 @@
 'use client';
 import Link from 'next/link';
+import { useConfirmation } from '@/shared/ui/confirmation';
 import { X } from 'lucide-react';
 import { Button, IconButton, InlineAlert } from '@/shared/ui/primitives';
 export { IncidentFiltersView } from './list-filters';
 import { useEffect, useRef, useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { AppError } from '@/shared/errors/app-error';
 import type { WorkspaceUser } from '@/entities/current-user/model';
 import {
@@ -162,6 +163,7 @@ export function CreateIncidentDialog({
   close: () => void;
   submit: (input: CreateIncidentInput, requestId: string) => Promise<void>;
 }) {
+  const confirmation = useConfirmation();
   const dialog = useRef<HTMLDialogElement>(null);
   const error = useRef<HTMLParagraphElement>(null);
   const pending = useRef(false);
@@ -172,6 +174,7 @@ export function CreateIncidentDialog({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<CreateIncidentInput>({
     resolver: resolver(users),
@@ -188,18 +191,40 @@ export function CreateIncidentDialog({
         previouslyFocused.focus();
     };
   }, []);
-  const cancel = () => {
+  const draft = useWatch({ control });
+  const hasDraft = Boolean(
+    draft.title?.trim() ||
+    draft.description?.trim() ||
+    draft.severity ||
+    draft.serviceIds?.length ||
+    draft.participantIds?.length,
+  );
+  useEffect(() => {
+    const unload = (event: BeforeUnloadEvent) => {
+      if (hasDraft || ambiguous || pending.current) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', unload);
+    return () => window.removeEventListener('beforeunload', unload);
+  }, [hasDraft, ambiguous]);
+  const cancel = async () => {
     if (pending.current) return;
     if (
-      (isDirty || ambiguous) &&
-      !window.confirm(
-        ambiguous
-          ? 'The previous submission may have succeeded. Close and check the list before creating another incident?'
-          : 'Discard this incident draft?',
-      )
+      ((isDirty && hasDraft) || ambiguous) &&
+      !(await confirmation.request({
+        title: ambiguous ? 'Check incident submission?' : 'Discard incident draft?',
+        description: ambiguous
+          ? 'The previous submission may have succeeded. Close this form and check the list before creating another incident.'
+          : 'This incident has not been created. Closing will discard the fields you entered.',
+        confirmLabel: ambiguous ? 'Close and check list' : 'Discard changes',
+        cancelLabel: 'Keep editing',
+        destructive: !ambiguous,
+      }))
     )
       return;
-    close();
+    if (!pending.current) close();
   };
   return (
     <dialog
@@ -229,6 +254,7 @@ export function CreateIncidentDialog({
         cancel();
       }}
     >
+      {confirmation.dialog}
       <div className="creation-header">
         <h2 id="create-incident-heading" className="text-section font-semibold">
           Create Incident

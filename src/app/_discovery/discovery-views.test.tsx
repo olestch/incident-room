@@ -110,6 +110,7 @@ it('inbox read/unread and activation use separate accessible actions', async () 
     markAll = vi.fn();
   render(
     <NotificationInbox
+      unreadCount={1}
       items={[notification]}
       busy={false}
       activate={activate}
@@ -145,9 +146,14 @@ it('inbox supports empty, pagination and retry without misleading empty-on-error
       retry={retry}
     />,
   );
-  expect(screen.getByText('No notifications.')).toBeVisible();
+  expect(
+    screen.getByText(
+      'No assignments, mentions or replies yet. New activity for your account will appear here.',
+    ),
+  ).toBeVisible();
   rerender(
     <NotificationInbox
+      unreadCount={1}
       items={[notification]}
       busy={false}
       activate={() => {}}
@@ -159,7 +165,11 @@ it('inbox supports empty, pagination and retry without misleading empty-on-error
       retry={retry}
     />,
   );
-  expect(screen.queryByText('No notifications.')).toBeNull();
+  expect(
+    screen.queryByText(
+      'No assignments, mentions or replies yet. New activity for your account will appear here.',
+    ),
+  ).toBeNull();
   await userEvent.click(screen.getByRole('button', { name: 'Load more notifications' }));
   await userEvent.click(screen.getByRole('button', { name: 'Retry Inbox' }));
   expect(more).toHaveBeenCalledTimes(1);
@@ -250,7 +260,11 @@ it('inbox loading keeps its heading and uses authoritative summary independent o
   expect(screen.getByRole('heading', { name: 'Notifications' })).toBeVisible();
   expect(screen.getByRole('status')).toHaveTextContent('Loading Notifications…');
   expect(screen.getByLabelText('Unread notifications unavailable')).toHaveTextContent('—');
-  expect(screen.queryByText('No notifications.')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(
+      'No assignments, mentions or replies yet. New activity for your account will appear here.',
+    ),
+  ).not.toBeInTheDocument();
   view.rerender(<NotificationInbox {...props} items={[notification]} unreadCount={37} />);
   expect(screen.getByLabelText('37 unread notifications')).toHaveTextContent('37');
   expect(screen.getByText('Timeline mention')).toBeVisible();
@@ -299,6 +313,7 @@ it('modified inbox activation keeps native link navigation without marking read'
   const activate = vi.fn();
   render(
     <NotificationInbox
+      unreadCount={1}
       items={[notification]}
       busy={false}
       activate={activate}

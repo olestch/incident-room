@@ -147,11 +147,12 @@ test('shell Search and notifications use canonical destinations and skip link re
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();
   const inbox = page.getByRole('link', {
-    name: 'Activity Inbox, 0 unread notifications',
+    name: 'Activity Inbox, 1 unread notifications',
     exact: true,
   });
   await expect(inbox).toBeVisible();
-  await expect(inbox.locator('.shell-unread')).toHaveCount(0);
+  await expect(inbox.locator('.shell-unread')).toHaveCount(1);
+  await expect(inbox.locator('.shell-unread')).toHaveText('1');
   await navigateApp(page, 'Search');
   await expect(page).toHaveURL('/app/search');
   await navigateApp(page, 'Notifications');

@@ -152,13 +152,16 @@ for (const size of [10000, 50000]) {
     await stableApp(page);
     await openDemo(page);
     await page.getByLabel('Timeline stress size').selectOption(String(size));
-    page.once('dialog', (dialog) => dialog.accept());
     const dataset = page.waitForResponse(
       (response) =>
         response.url().includes('/mock-api/incidents/INC-2841/timeline') &&
         response.request().method() === 'GET',
     );
     await page.getByRole('button', { name: 'Replace showcase dataset' }).click();
+    await page
+      .getByRole('dialog', { name: 'Replace showcase dataset?' })
+      .getByRole('button', { name: 'Replace dataset', exact: true })
+      .click();
     expect((await (await dataset).json()).total).toBe(size);
     const viewport = page.getByLabel('Timeline viewport', { exact: true });
     await expect(
@@ -188,8 +191,14 @@ for (const size of [10000, 50000]) {
     );
     expect(await page.locator('[data-entry-id]').count()).toBeLessThan(80);
     await openDemo(page);
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Reset Demo data' }).click();
+    await page
+      .getByRole('dialog', { name: 'Demo tools', exact: true })
+      .getByRole('button', { name: 'Reset Demo data', exact: true })
+      .click();
+    await page
+      .getByRole('dialog', { name: 'Reset Demo data?', exact: true })
+      .getByRole('button', { name: 'Reset Demo data', exact: true })
+      .click();
     await expect(page).toHaveURL(/\/login/);
     await signIn(page);
     await stableApp(page);

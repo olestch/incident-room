@@ -1,4 +1,19 @@
 import '@testing-library/jest-dom/vitest';
+// jsdom has no native top layer. Browser tests verify inertness and actual focus trapping.
+if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal)
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true,
+    value() {
+      this.setAttribute('open', '');
+    },
+  });
+if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.close)
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true,
+    value() {
+      this.removeAttribute('open');
+    },
+  });
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 

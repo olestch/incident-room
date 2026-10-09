@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { AppError } from '@/shared/errors/app-error';
 import { Button, Badge, InlineAlert } from '@/shared/ui/primitives';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useConfirmation } from '@/shared/ui/confirmation';
 import { SafeText } from '@/shared/ui/safe-text';
 import type { WorkspaceUser } from '@/entities/current-user/model';
 import {
@@ -45,6 +46,11 @@ function useRevisionForm<T extends FieldValues, R extends T & { revision: number
   save: (fields: T, revision: number) => Promise<R>,
   changed: (dirty: boolean) => void,
 ) {
+  const confirmation = useConfirmation();
+  const latestRecord = useRef(record);
+  useEffect(() => {
+    latestRecord.current = record;
+  }, [record]);
   const form = useForm<T>({
     defaultValues: record as DefaultValues<T>,
     resolver: resolver(schema),
@@ -56,10 +62,11 @@ function useRevisionForm<T extends FieldValues, R extends T & { revision: number
   const [localCopy, setLocalCopy] = useState<T | null>(null);
   const busy = useRef(false);
   const dirty = form.formState.isDirty;
+  const saving = form.formState.isSubmitting;
   useEffect(() => {
-    changed(dirty);
+    changed(dirty || saving);
     return () => changed(false);
-  }, [dirty, changed]);
+  }, [dirty, saving, changed]);
   useEffect(() => {
     if (!dirty && !busy.current && record.revision > base) {
       form.reset(record);
@@ -88,23 +95,43 @@ function useRevisionForm<T extends FieldValues, R extends T & { revision: number
     })(event);
   const newer =
     record.revision > base || (issue instanceof AppError && issue.category === 'conflict');
-  const reload = () => {
+  const reload = async () => {
+    if (busy.current) return;
     if (newer && record.revision <= base) return;
     if (
       dirty &&
-      !window.confirm(
-        'Replace unsaved fields with the latest version? A local reference copy will remain on this page.',
-      )
+      !(await confirmation.request({
+        title: 'Replace unsaved fields?',
+        description:
+          'Load the latest saved version in place of your edits. A local reference copy of your current fields will remain on this page until you leave.',
+        confirmLabel: 'Replace fields',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      }))
     )
       return;
+    if (busy.current) return;
     if (dirty) setLocalCopy(form.getValues());
-    form.reset(record);
-    setBase(record.revision);
+    const current = latestRecord.current;
+    form.reset(current);
+    setBase(current.revision);
     setIssue(null);
     setReview(false);
     setSaved(false);
   };
-  return { form, base, issue, saved, review, setReview, localCopy, newer, reload, submit };
+  return {
+    form,
+    base,
+    issue,
+    saved,
+    review,
+    setReview,
+    localCopy,
+    newer,
+    reload,
+    submit,
+    confirmation: confirmation.dialog,
+  };
 }
 function RevisionFeedback({
   newer,
@@ -117,6 +144,7 @@ function RevisionFeedback({
   reload,
   latest,
   localCopy,
+  confirmation,
 }: {
   newer: boolean;
   issue: Error | null;
@@ -128,9 +156,11 @@ function RevisionFeedback({
   reload: () => void;
   latest: ReactNode;
   localCopy: ReactNode;
+  confirmation: ReactNode;
 }) {
   return (
     <>
+      {confirmation}
       {newer && (
         <InlineAlert className="revision-conflict">
           <p className="revision-title">Newer revision available</p>

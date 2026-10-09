@@ -206,11 +206,11 @@ test('dirty close warns, keeps form on cancel, returns focus; detail missing and
   const trigger = page.getByRole('button', { name: 'Create Incident', exact: true });
   await trigger.click();
   await page.getByLabel('Title (required)').fill('Unsaved fictional work');
-  page.once('dialog', (dialog) => dialog.dismiss());
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Keep editing', exact: true }).click();
   await expect(page.getByLabel('Title (required)')).toHaveValue('Unsaved fictional work');
-  page.once('dialog', (dialog) => dialog.accept());
   await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Discard changes', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await page.goto('/app/incidents/INC-9999');

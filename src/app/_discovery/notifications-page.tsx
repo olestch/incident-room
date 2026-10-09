@@ -38,7 +38,7 @@ function IdentityInbox({ userId, workspaceId }: { userId: string; workspaceId: s
   const cache = useQueryClient();
   const router = useRouter();
   const commands = useCommands();
-  const [issue, setIssue] = useState(false);
+  const [issue, setIssue] = useState<string | null>(null);
   const unread = useQuery<UnreadSummary>({
     queryKey: notificationKeys.unread(userId, workspaceId),
     queryFn: skipToken,
@@ -78,18 +78,19 @@ function IdentityInbox({ userId, workspaceId }: { userId: string; workspaceId: s
       cacheUnread(cache, userId, workspaceId, result.unread);
       await cache.invalidateQueries({ queryKey: notificationKeys.inbox(userId, workspaceId) });
     },
-    onError: () => setIssue(true),
+    onError: (error) => setIssue(error.message),
   });
   const mark = async (id: string | null, read: boolean) => {
-    setIssue(false);
+    setIssue(null);
     await mutation.mutateAsync({ id, read });
   };
   const activate = async (item: Notification) => {
+    if (mutation.isPending) return;
     const generation = coordinator.snapshot().generation;
     try {
       await mark(item.id, true);
-    } catch {
-      commands?.announceReadFailure();
+    } catch (error) {
+      commands?.announceReadFailure(error instanceof Error ? error.message : undefined);
     }
     const state = coordinator.snapshot();
     if (
@@ -120,7 +121,8 @@ function IdentityInbox({ userId, workspaceId }: { userId: string; workspaceId: s
       />
       {issue && (
         <InlineAlert className="secondary-page secondary-mutation-alert">
-          Read state was not saved. You can retry from the inbox; navigation remains available.
+          Read state was not saved. {issue} You can retry from the inbox; navigation remains
+          available.
         </InlineAlert>
       )}
     </>

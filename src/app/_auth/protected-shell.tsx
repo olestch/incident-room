@@ -68,6 +68,13 @@ function IdentityShellContent({
   const router = useRouter();
   const [logoutState, setLogoutState] = useState<'idle' | 'pending'>('idle');
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [navigationRoute, setNavigationRoute] = useState(pathname);
+  // A deferred review link uses router.push after the local decision, so its
+  // original onNavigate callback cannot close the mobile navigation drawer.
+  if (navigationRoute !== pathname) {
+    setNavigationRoute(pathname);
+    setNavigationOpen(false);
+  }
   const [demoOpen, setDemoOpen] = useState(false);
   const commands = useCommands();
   const unread = useShellUnread(identity.userId, identity.workspaceId);
@@ -89,10 +96,7 @@ function IdentityShellContent({
       coordinator.request((scoped) => adapter.currentUser(scoped, identity), 'safe-read', signal),
     refetchInterval: 60_000,
   });
-  const navigate = (event: { preventDefault(): void }) => {
-    if (!(commands?.canLeave() ?? true)) event.preventDefault();
-    else setNavigationOpen(false);
-  };
+  const navigate = () => setNavigationOpen(false);
   const navigation = (
     <ShellNavigation
       pathname={pathname}
@@ -145,9 +149,8 @@ function IdentityShellContent({
               role={current.data.role}
               userId={identity.userId}
               pending={logoutState === 'pending'}
-              canLeave={() => commands?.canLeave() ?? true}
-              logout={() => {
-                if (!(commands?.canLeave() ?? true)) return;
+              logout={async () => {
+                if (!(await (commands?.canLeave() ?? Promise.resolve(true)))) return;
                 setLogoutState('pending');
                 void coordinator
                   .logout()
@@ -187,7 +190,8 @@ function IdentityShellContent({
             )}
             {commands?.readNotice && (
               <InlineAlert>
-                Read state was not saved. Navigation is still available; retry from the inbox.{' '}
+                Read state was not saved. {commands.readNotice} Navigation is still available; retry
+                from the inbox.{' '}
                 <Button variant="quiet" onClick={commands.dismissReadNotice}>
                   Dismiss read notice
                 </Button>

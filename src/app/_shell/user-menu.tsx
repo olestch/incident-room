@@ -10,14 +10,12 @@ export function UserMenu({
   userId,
   pending,
   logout,
-  canLeave,
 }: {
   name: string;
   role: string;
   userId: string;
   pending: boolean;
   logout(): void;
-  canLeave(): boolean;
 }) {
   const id = useId();
   const popover = useRef<HTMLDivElement>(null);
@@ -54,10 +52,7 @@ export function UserMenu({
         <Link
           className="shell-menu-action"
           href={`/app/profile/${encodeURIComponent(userId)}`}
-          onNavigate={(event) => {
-            if (!canLeave()) event.preventDefault();
-            else popover.current?.hidePopover();
-          }}
+          onNavigate={() => popover.current?.hidePopover()}
         >
           <UserRound size={16} aria-hidden="true" />
           My profile

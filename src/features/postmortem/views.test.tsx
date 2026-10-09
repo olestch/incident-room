@@ -71,12 +71,19 @@ it('keeps dirty text on remote update, reviews latest and reloads with retained 
   expect(screen.getByLabelText('Summary')).toHaveValue('My local work');
   await userEvent.click(screen.getByRole('button', { name: 'Review latest' }));
   expect(screen.getByLabelText('Latest server version')).toHaveTextContent('Server work');
-  vi.spyOn(window, 'confirm').mockReturnValue(false);
   await userEvent.click(screen.getByRole('button', { name: 'Reload latest' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
   expect(screen.getByLabelText('Summary')).toHaveValue('My local work');
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
   await userEvent.click(screen.getByRole('button', { name: 'Reload latest' }));
-  expect(screen.getByLabelText('Summary')).toHaveValue('Server work');
+  view.rerender(
+    <PostmortemEditor
+      {...props}
+      record={{ ...record, revision: 3, summary: 'Newest server work' }}
+    />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Replace fields' }));
+  expect(screen.getByLabelText('Summary')).toHaveValue('Newest server work');
+  expect(screen.getByText(/Based on revision 3/)).toBeVisible();
   await userEvent.click(screen.getByText('Retained local reference (not saved)'));
   expect(screen.getByText('My local work')).toBeVisible();
 });

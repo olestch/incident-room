@@ -638,3 +638,40 @@ body:has(.ui-drawer-bottom[open]) {
     background: CanvasText;
   }
 }
+
+.ui-confirmation {
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 1.25rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+.ui-confirmation::backdrop {
+  background: rgb(23 43 58 / 45%);
+}
+.ui-confirmation > p {
+  margin-block: 1rem;
+}
+.ui-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.ui-confirmation-actions .ui-button {
+  white-space: normal;
+}
+@media (forced-colors: active) {
+  .ui-confirmation {
+    border-color: CanvasText;
+  }
+  .ui-confirmation::backdrop {
+    background: Canvas;
+    opacity: 0.75;
+  }
+}

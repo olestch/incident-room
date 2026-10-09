@@ -7,10 +7,15 @@ import { NotificationsPage } from './notifications-page';
 const fake = vi.hoisted(() => ({
   notification: null as unknown,
   read: false,
+  failRead: false,
+  notice: vi.fn(),
   revision: 1,
   calls: [] as unknown[],
   paths: [] as string[],
   push: vi.fn(),
+}));
+vi.mock('./commands-context', () => ({
+  useCommands: () => ({ announceReadFailure: fake.notice }),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fake.push }) }));
 vi.mock('@/app/_providers/session-provider', () => ({
@@ -31,6 +36,7 @@ vi.mock('@/app/_providers/session-provider', () => ({
         const item = notificationSchema.parse(fake.notification);
         if (path === '/notifications/read') {
           fake.calls.push(body);
+          if (fake.failRead) throw new Error('Simulated read persistence failure.');
           const command = body as { id: string | null; read: boolean };
           fake.read = command.read;
           fake.revision++;
@@ -59,6 +65,8 @@ vi.mock('@/app/_providers/session-provider', () => ({
 }));
 beforeEach(() => {
   fake.read = false;
+  fake.failRead = false;
+  fake.notice.mockClear();
   fake.revision = 1;
   fake.calls = [];
   fake.paths = [];
@@ -133,5 +141,29 @@ it('observes authoritative unread revisions without starting a second unread req
   expect(cache.getQueryState(key)?.fetchStatus).toBe('idle');
   expect(fake.paths).not.toContain('/notifications/unread');
   unmount();
+  cache.clear();
+});
+
+it('failed read preserves unread authority and useful error details while allowing exact navigation', async () => {
+  fake.failRead = true;
+  const cache = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const view = render(
+    <QueryClientProvider client={cache}>
+      <NotificationsPage />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: /^Mark read$/ }));
+  await screen.findByText(/Simulated read persistence failure/);
+  expect(screen.getByLabelText('1 unread notifications')).toHaveTextContent('1');
+  expect(screen.getByRole('button', { name: /^Mark read$/ })).toBeEnabled();
+  fireEvent.click(screen.getByRole('link', { name: 'INC-2841: mentioned you' }));
+  await waitFor(() =>
+    expect(fake.push).toHaveBeenCalledWith('/app/incidents/INC-2841?event=entry'),
+  );
+  expect(fake.notice).toHaveBeenCalledWith('Simulated read persistence failure.');
+  expect(fake.read).toBe(false);
+  view.unmount();
   cache.clear();
 });

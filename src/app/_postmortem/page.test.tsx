@@ -12,6 +12,7 @@ const fake = vi.hoisted(() => ({
   initiated: [] as unknown[],
   denied: false,
 }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/app/_providers/session-provider', () => ({
   useSessionRuntime: () => ({
     state: { generation: 1, identity: { userId: 'demo-sage', workspaceId: 'demo-orbit' } },
@@ -146,10 +147,12 @@ it('warns before editor-level link navigation and keeps unsaved fields when decl
   fireEvent.click(await screen.findByRole('button', { name: 'Initiate Postmortem' }));
   const input = await screen.findByLabelText('Summary');
   fireEvent.change(input, { target: { value: 'Unsaved' } });
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
   await waitFor(() => expect(input).toHaveValue('Unsaved'));
   fireEvent.click(screen.getByRole('link', { name: 'Back to Incident Room' }));
-  expect(confirm).toHaveBeenCalledWith('Leave this Postmortem and discard unsaved fields?');
+  expect(
+    await screen.findByRole('dialog', { name: 'Discard unsaved review changes?' }),
+  ).toHaveTextContent('in-flight save');
+  fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
   expect(input).toHaveValue('Unsaved');
   cleanup();
 });
@@ -167,6 +170,7 @@ it('does not block a same-document skip/focus link when editor is dirty', async 
   skip.dispatchEvent(event);
   expect(event.defaultPrevented).toBe(false);
   expect(confirm).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(input).toHaveValue('Unsaved');
   skip.remove();
   cleanup();

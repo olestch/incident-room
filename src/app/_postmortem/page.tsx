@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useConfirmation } from '@/shared/ui/confirmation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -63,6 +65,8 @@ function IdentityPostmortem({
   const { coordinator, adapter, state } = useSessionRuntime();
   const cache = useQueryClient();
   const commands = useCommands();
+  const router = useRouter();
+  const { request: requestConfirmation, dialog: leaveDialog } = useConfirmation();
   const dirty = useRef(new Set<string>());
   const setDirty = useCallback((id: string, value: boolean) => {
     if (value) dirty.current.add(id);
@@ -70,12 +74,19 @@ function IdentityPostmortem({
   }, []);
   const formChanged = useCallback((value: boolean) => setDirty('document', value), [setDirty]);
   const createChanged = useCallback((value: boolean) => setDirty('create', value), [setDirty]);
-  const canLeave = useCallback(
-    () =>
-      dirty.current.size === 0 ||
-      window.confirm('Leave this Postmortem and discard unsaved fields?'),
-    [],
-  );
+  const canLeave = useCallback(async () => {
+    if (!dirty.current.size) return true;
+    const discard = await requestConfirmation({
+      title: 'Discard unsaved review changes?',
+      description:
+        'Your Postmortem and Action Item edits have not all been saved. Leaving will discard local fields; an in-flight save may still complete.',
+      confirmLabel: 'Discard changes',
+      cancelLabel: 'Keep editing',
+      destructive: true,
+    });
+    if (discard) dirty.current.clear();
+    return discard;
+  }, [requestConfirmation]);
   useEffect(() => commands?.registerLeave(canLeave), [commands, canLeave]);
   useEffect(() => {
     const unload = (event: BeforeUnloadEvent) => {
@@ -103,9 +114,15 @@ function IdentityPostmortem({
         destination.search === location.search
       )
         return;
-      if (anchor.href !== location.href && !canLeave()) {
+      if (anchor.href !== location.href && dirty.current.size) {
         event.preventDefault();
         event.stopPropagation();
+        void canLeave().then((allowed) => {
+          if (!allowed) return;
+          if (destination.origin === location.origin)
+            router.push(destination.pathname + destination.search + destination.hash);
+          else window.location.assign(destination.href);
+        });
       }
     };
     window.addEventListener('beforeunload', unload);
@@ -114,7 +131,7 @@ function IdentityPostmortem({
       window.removeEventListener('beforeunload', unload);
       window.document.removeEventListener('click', click, true);
     };
-  }, [canLeave]);
+  }, [canLeave, router]);
   const read = <T,>(path: string, schema: z.ZodType<T>, signal: AbortSignal) =>
     coordinator.request((s) => adapter.resource(path, schema, s), 'safe-read', signal);
   const current = useQuery({
@@ -264,6 +281,7 @@ function IdentityPostmortem({
   if (!record || !users.data || !current.data || unavailable)
     return (
       <section className="secondary-page postmortem-page">
+        {leaveDialog}
         <header className="secondary-page-header">
           <p className="secondary-eyebrow">Incident review</p>
           <h1>Postmortem</h1>
@@ -295,6 +313,7 @@ function IdentityPostmortem({
   if (record.status !== 'resolved')
     return (
       <section className="secondary-page postmortem-page">
+        {leaveDialog}
         <header className="secondary-page-header">
           <h1>Postmortem</h1>
         </header>
@@ -310,6 +329,7 @@ function IdentityPostmortem({
     users.data?.find((user) => user.id === id)?.name ?? 'Unavailable user';
   return (
     <section className="secondary-page postmortem-page">
+      {leaveDialog}
       <Link href={`/app/incidents/${number}`} className="secondary-text-link">
         <ArrowLeft size={16} aria-hidden="true" /> Back to Incident Room
       </Link>

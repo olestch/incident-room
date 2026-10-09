@@ -70,7 +70,6 @@ test('confirmed 50k dataset uses bounded DOM and reloadable old target', async (
   await login(page);
   await controls(page);
   await page.getByLabel('Timeline stress size').selectOption('50000');
-  page.once('dialog', (d) => d.accept());
   const dataset = page.waitForResponse(
     (r) =>
       r.url().includes('/mock-api/incidents/INC-2841/timeline') && r.request().method() === 'GET',
@@ -80,6 +79,10 @@ test('confirmed 50k dataset uses bounded DOM and reloadable old target', async (
       new URL(response.url()).pathname === '/mock-api/incidents/INC-2841/realtime/stream',
   );
   await page.getByRole('button', { name: 'Replace showcase dataset' }).click();
+  await page
+    .getByRole('dialog', { name: 'Replace showcase dataset?' })
+    .getByRole('button', { name: 'Replace dataset', exact: true })
+    .click();
   expect((await (await dataset).json()).total).toBe(50000);
   // Initial history and transport readiness complete independently after dataset replacement.
   expect((await transport).status()).toBe(200);
@@ -132,15 +135,31 @@ test('reset restores seed, clears generated persistent work and requires single 
   const other = await context.newPage();
   await other.goto('/app/incidents');
   await expect(other.getByRole('list', { name: 'Incidents', exact: true })).toBeVisible();
-  page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Reset Demo data' }).click();
+  await page
+    .getByRole('dialog', { name: 'Demo tools', exact: true })
+    .getByRole('button', { name: 'Reset Demo data', exact: true })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Reset Demo data?', exact: true })
+    .getByRole('button', { name: 'Reset Demo data', exact: true })
+    .click();
   await expect(page.getByText('Demo operation unavailable.', { exact: false })).toBeVisible();
   await expect(page.getByLabel('Current user')).toContainText('River Vale');
+  await page
+    .getByRole('dialog', { name: 'Reset Demo data?', exact: true })
+    .getByRole('button', { name: 'Cancel', exact: true })
+    .click();
   await other.close();
   await page.getByRole('button', { name: 'Generate persistent event' }).click();
   await expect(page.getByText('Generated monitoring activity', { exact: false })).toBeVisible();
-  page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Reset Demo data' }).click();
+  await page
+    .getByRole('dialog', { name: 'Demo tools', exact: true })
+    .getByRole('button', { name: 'Reset Demo data', exact: true })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Reset Demo data?', exact: true })
+    .getByRole('button', { name: 'Reset Demo data', exact: true })
+    .click();
   await expect(page).toHaveURL(/\/login/);
   await login(page);
   const baseline = page.waitForResponse(
@@ -152,6 +171,11 @@ test('reset restores seed, clears generated persistent work and requires single 
   await expect(page.getByLabel('Realtime connection', { exact: true })).toHaveText('Connected');
   await expect(page.locator('[data-entry-id="fictional-incident-2841:evt-4000"]')).toBeVisible();
   await expect(page.locator('[data-entry-id]').filter({ hasText: 'Demo activity' })).toHaveCount(0);
+  await navigateApp(page, 'Notifications');
+  await expect(
+    page.getByRole('list', { name: 'Notifications', exact: true }).getByRole('listitem'),
+  ).toHaveCount(2);
+  await expect(page.locator('main').getByLabel('1 unread notifications')).toHaveText('1');
 });
 test('reviewer journeys and responsive keyboard controls remain usable', async ({ page }) => {
   const errors: string[] = [];

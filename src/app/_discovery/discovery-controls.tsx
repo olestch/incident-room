@@ -110,9 +110,6 @@ export function DiscoveryControls({
         aria-label="Search workspace"
         title="Search workspace"
         className="shell-action"
-        onNavigate={(event) => {
-          if (!(appCommands?.canLeave() ?? true)) event.preventDefault();
-        }}
       >
         <Search size={18} aria-hidden="true" />
         <span className="shell-action-label">Search</span>
@@ -122,9 +119,6 @@ export function DiscoveryControls({
         aria-label={`Activity Inbox, ${unreadCount === undefined ? 'unread count unavailable' : `${unreadCount} unread notifications`}`}
         title="Notifications"
         className="shell-action"
-        onNavigate={(event) => {
-          if (!(appCommands?.canLeave() ?? true)) event.preventDefault();
-        }}
       >
         <Bell size={18} aria-hidden="true" />
         {unreadCount !== undefined && unreadCount > 0 && (
@@ -163,8 +157,13 @@ export function DiscoveryControls({
             setOpen(false);
             if (command.action === 'create') appCommands?.create();
             else if (command.action === 'close-thread') appCommands?.closeThread();
-            else if (command.destination && (appCommands?.canLeave() ?? true))
-              router.push(command.destination);
+            else if (command.destination) {
+              const destination = command.destination;
+              void (async () => {
+                if (await (appCommands?.canLeave() ?? Promise.resolve(true)))
+                  router.push(destination);
+              })();
+            }
           }}
         />
       )}

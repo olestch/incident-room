@@ -16,26 +16,29 @@ const CommandsContext = createContext<{
   openPalette: () => void;
   registerThread: (callback: () => void) => () => void;
   closeThread: () => void;
-  registerLeave: (callback: () => boolean) => () => void;
-  canLeave: () => boolean;
-  readNotice: boolean;
-  announceReadFailure: () => void;
+  registerLeave: (callback: () => boolean | Promise<boolean>) => () => void;
+  canLeave: () => Promise<boolean>;
+  readNotice: string | null;
+  announceReadFailure: (detail?: string) => void;
   dismissReadNotice: () => void;
 } | null>(null);
 export function CommandsProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [readNotice, setReadNotice] = useState(false);
-  const announceReadFailure = useCallback(() => setReadNotice(true), []);
-  const dismissReadNotice = useCallback(() => setReadNotice(false), []);
+  const [readNotice, setReadNotice] = useState<string | null>(null);
+  const announceReadFailure = useCallback(
+    (detail = 'Read state could not be saved.') => setReadNotice(detail),
+    [],
+  );
+  const dismissReadNotice = useCallback(() => setReadNotice(null), []);
   const port = useRef<(() => void) | null>(null);
-  const leave = useRef<(() => boolean) | null>(null);
-  const registerLeave = useCallback((callback: () => boolean) => {
+  const leave = useRef<(() => boolean | Promise<boolean>) | null>(null);
+  const registerLeave = useCallback((callback: () => boolean | Promise<boolean>) => {
     leave.current = callback;
     return () => {
       if (leave.current === callback) leave.current = null;
     };
   }, []);
-  const canLeave = useCallback(() => leave.current?.() ?? true, []);
+  const canLeave = useCallback(async () => leave.current?.() ?? true, []);
   const pending = useRef(false);
   const palette = useRef<(() => void) | null>(null),
     thread = useRef<(() => void) | null>(null);
@@ -63,8 +66,8 @@ export function CommandsProvider({ children }: { children: ReactNode }) {
       if (port.current === callback) port.current = null;
     };
   }, []);
-  const create = useCallback(() => {
-    if (!canLeave()) return;
+  const create = useCallback(async () => {
+    if (!(await canLeave())) return;
     if (port.current) port.current();
     else {
       pending.current = true;

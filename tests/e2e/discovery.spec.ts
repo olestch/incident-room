@@ -33,12 +33,24 @@ async function room(page: Page) {
 }
 async function pair(context: BrowserContext, page: Page) {
   await login(page);
+  await navigateApp(page, 'Notifications');
+  await expect(
+    page.getByRole('list', { name: 'Notifications', exact: true }).locator(':scope > li'),
+  ).toHaveCount(2);
+  await page.getByRole('button', { name: 'Mark all as read', exact: true }).click();
+  await expect(
+    page.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
   await room(page);
   await context.clearCookies();
   const second = await context.newPage();
   await login(second, 'sage.linden@example.test');
   await navigateApp(second, 'Notifications');
   await expect(second.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
+  await expect(
+    second.getByRole('list', { name: 'Notifications', exact: true }).locator(':scope > li'),
+  ).toHaveCount(4);
+  await second.getByRole('button', { name: 'Mark all as read', exact: true }).click();
   await expect(
     second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
   ).toBeVisible();
@@ -248,11 +260,14 @@ test('notification live delivery is recipient-only, unique and follows exact Tim
   const items = second
     .getByRole('list', { name: 'Notifications', exact: true })
     .locator(':scope > li');
-  await expect(items).toHaveCount(1);
+  await expect(items).toHaveCount(5);
   await expect(
     page.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
   ).toBeVisible();
-  const link = items.getByRole('link');
+  const link = items.getByRole('link', {
+    name: 'INC-2841: mentioned you in the Timeline',
+    exact: true,
+  });
   const href = await link.getAttribute('href');
   expect(href).toContain('?event=');
   await link.click();
@@ -278,7 +293,7 @@ test('mark unread and bulk read converge badge without one request per record', 
   const rows = second
     .getByRole('list', { name: 'Notifications', exact: true })
     .locator(':scope > li');
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(6);
   await rows.first().getByRole('button', { name: 'Mark read', exact: true }).click();
   await expect(
     second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
@@ -301,7 +316,9 @@ test('failed read mutation preserves canonical navigation and a visible retry no
 }) => {
   const second = await pair(context, page);
   await mention(page);
-  const link = second.getByRole('list', { name: 'Notifications', exact: true }).getByRole('link');
+  const link = second
+    .getByRole('list', { name: 'Notifications', exact: true })
+    .getByRole('link', { name: 'INC-2841: mentioned you in the Timeline', exact: true });
   await expect(link).toBeVisible();
   await second.evaluate(
     () =>
@@ -355,10 +372,14 @@ test('recipient logout then another identity never restores previous inbox or un
     second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
   ).toBeVisible();
   await expect(second.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible();
-  await expect(second.getByText('No notifications.', { exact: true })).toBeVisible();
+  await expect(
+    second.getByText('Sage Linden replied in INC-2841 · Queue measurements discussion', {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     second.getByRole('list', { name: 'Notifications', exact: true }).locator(':scope > li'),
-  ).toHaveCount(0);
+  ).toHaveCount(2);
   await expect(second.getByText('Fictional recipient evidence 1', { exact: true })).toHaveCount(0);
 });
 test('notification disconnect and expired checkpoint recover through existing resync', async ({
@@ -400,7 +421,7 @@ test('notification disconnect and expired checkpoint recover through existing re
   ).toBeVisible();
   await expect(
     second.getByRole('list', { name: 'Notifications', exact: true }).locator(':scope > li'),
-  ).toHaveCount(1);
+  ).toHaveCount(5);
 });
 test('Thread reply notification uses Phase 6 root/message destination', async ({
   page,
@@ -414,6 +435,10 @@ test('Thread reply notification uses Phase 6 root/message destination', async ({
   const second = await context.newPage();
   await login(second, 'sage.linden@example.test');
   await navigateApp(second, 'Notifications');
+  await second.getByRole('button', { name: 'Mark all as read', exact: true }).click();
+  await expect(
+    second.getByRole('link', { name: 'Activity Inbox, 0 unread notifications', exact: true }),
+  ).toBeVisible();
   await thread
     .getByLabel('Message', { exact: true })
     .fill('Fictional contextual notification evidence');
@@ -421,7 +446,10 @@ test('Thread reply notification uses Phase 6 root/message destination', async ({
   await expect(
     second.getByRole('link', { name: 'Activity Inbox, 1 unread notifications', exact: true }),
   ).toBeVisible();
-  await second.getByRole('list', { name: 'Notifications', exact: true }).getByRole('link').click();
+  await second
+    .getByRole('list', { name: 'Notifications', exact: true })
+    .getByRole('link', { name: 'INC-2841: new contextual reply', exact: true })
+    .click();
   await expect(second).toHaveURL((url) =>
     Boolean(url.searchParams.get('thread') && url.searchParams.get('message')),
   );
