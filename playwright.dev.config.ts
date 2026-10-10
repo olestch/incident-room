@@ -10,6 +10,7 @@ export default defineConfig({
   use: { ...production.use, baseURL: 'http://localhost:3101' },
   webServer: {
     command: 'pnpm dev --hostname localhost --port 3101',
+    env: { INCIDENT_ROOM_DEV_E2E: '1' },
     url: 'http://localhost:3101',
     reuseExistingServer: false,
     timeout: 60_000,
