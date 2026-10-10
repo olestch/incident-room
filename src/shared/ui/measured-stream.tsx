@@ -23,19 +23,29 @@ export const MeasuredStream = forwardRef<
     targetId?: string | null | undefined;
     newEntryIds?: string[] | undefined;
     goLatest?: (() => void) | undefined;
+    onUserScroll?: (() => void) | undefined;
   }
 >(function MeasuredStream(
-  { rows, renderRow, label, highlight, targetActive, targetId, newEntryIds = [], goLatest },
+  {
+    rows,
+    renderRow,
+    label,
+    highlight,
+    targetActive,
+    targetId,
+    newEntryIds = [],
+    goLatest,
+    onUserScroll,
+  },
   ref,
 ) {
-  'use no memo'; // TanStack Virtual exposes mutable imperative methods; keep this measured boundary outside React Compiler.
+  'use no memo'; // Compatibility boundary for TanStack Virtual's mutable imperative instance.
   const container = useRef<HTMLDivElement>(null);
-  const mounted = useRef(new Map<string, HTMLLIElement>());
-  const pending = useRef<{
+  const pendingReveal = useRef<{
     id: string;
+    index: number | null;
     resolve(): void;
     reject(reason: unknown): void;
-    signal: AbortSignal;
     cleanup(): void;
   } | null>(null);
   const initialized = useRef(false);
@@ -67,6 +77,7 @@ export const MeasuredStream = forwardRef<
     },
     [focused, indexes],
   );
+  // Virtual owns prepend anchoring, size compensation and near-end append following.
   const virtual = useVirtualizer<HTMLDivElement, HTMLLIElement>({
     count: rows.length,
     getScrollElement: () => container.current,
@@ -78,75 +89,122 @@ export const MeasuredStream = forwardRef<
     followOnAppend: targetActive ? false : 'auto',
     scrollEndThreshold: 96,
   });
-  // First measurements replace an estimated block above the fold, including the
-  // partially visible row. Later growth only compensates rows fully above it.
+  // Keep late growth entirely above a reader anchored even during backward scrolling.
+  // Virtual's default skips that remeasurement, which loses the anchor (browser regression).
+  // First measurements also replace the estimated block of the partially visible row.
   virtual.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
     const offset = (instance.scrollOffset ?? 0) + instance.scrollAdjustments;
     return instance.itemSizeCache.has(item.key) ? item.end <= offset : item.start < offset;
   };
-  const settle = useCallback(() => {
-    const task = pending.current;
-    if (!task || task.signal.aborted) return;
-    const index = targetIndexes.get(task.id);
-    if (index === undefined) return;
-    virtual.scrollToIndex(index, { align: 'center', behavior: 'auto' });
-    const node = mounted.current.get(task.id);
+  const virtualItems = virtual.getVirtualItems();
+  const cancelReveal = useCallback(
+    (reason: unknown, stopScroll = true) => {
+      const task = pendingReveal.current;
+      pendingReveal.current = null;
+      task?.cleanup();
+      // Virtual has no separate cancellation API. Replace its pending target once.
+      if (stopScroll && task && task.index !== null && container.current)
+        virtual.scrollToOffset(container.current.scrollTop, { behavior: 'auto' });
+      task?.reject(reason);
+    },
+    [virtual],
+  );
+  // Readiness observes the bounded mounted range; it never issues a scroll command.
+  const resolveVisibleTarget = useCallback(() => {
+    const task = pendingReveal.current;
     const scroller = container.current;
-    if (!node || !scroller || !node.getBoundingClientRect().height) return;
+    if (!task || task.index === null || !scroller) return;
+    const node = [...scroller.querySelectorAll<HTMLElement>('[data-entry-id]')].find(
+      (row) => row.dataset.entryId === task.id,
+    );
+    if (!node) return;
     const box = node.getBoundingClientRect();
     const frame = scroller.getBoundingClientRect();
-    if (box.bottom > frame.top && box.top < frame.bottom) {
+    if (box.height && box.bottom > frame.top && box.top < frame.bottom) {
+      pendingReveal.current = null;
       task.cleanup();
-      pending.current = null;
       task.resolve();
     }
+  }, []);
+  const startTargetScroll = useCallback(() => {
+    const task = pendingReveal.current;
+    if (!task) return;
+    const index = targetIndexes.get(task.id);
+    if (index === undefined || task.index === index) return;
+    task.index = index;
+    widthAnchor.current = null;
+    // Command once per acquired index (prepend may move it); Virtual reconciles row sizes.
+    virtual.scrollToIndex(index, { align: 'center', behavior: 'auto' });
   }, [targetIndexes, virtual]);
+  const latest = useCallback(() => {
+    cancelReveal(new DOMException('Latest requested', 'AbortError'));
+    widthAnchor.current = null;
+    initialized.current = true;
+    nearEnd.current = true;
+    setUpdates([]);
+    virtual.scrollToEnd({ behavior: 'auto' });
+  }, [cancelReveal, virtual]);
+  const interruptNavigation = () => {
+    cancelReveal(new DOMException('User took scroll control', 'AbortError'));
+    widthAnchor.current = null;
+    initialized.current = true;
+    onUserScroll?.(); // The route also owns acquisition, which may not have reached reveal yet.
+  };
   useImperativeHandle(
     ref,
     () => ({
-      latest: () => {
-        initialized.current = true;
-        virtual.scrollToEnd({ behavior: 'auto' });
-      },
+      latest,
       reveal: (id, signal) =>
         new Promise<void>((resolve, reject) => {
-          pending.current?.reject(new DOMException('Target superseded', 'AbortError'));
-          pending.current?.cleanup();
-          const abort = () => {
-            if (pending.current?.id === id) pending.current = null;
-            reject(signal.reason);
-          };
-          const cleanup = () => signal.removeEventListener('abort', abort);
+          cancelReveal(new DOMException('Target superseded', 'AbortError'));
           if (signal.aborted) {
             reject(signal.reason);
             return;
           }
+          const task = {
+            id,
+            index: null as number | null,
+            resolve,
+            reject,
+            cleanup: () => signal.removeEventListener('abort', abort),
+          };
+          const abort = () => {
+            if (pendingReveal.current === task) cancelReveal(signal.reason);
+          };
           signal.addEventListener('abort', abort, { once: true });
-          pending.current = { id, signal, resolve, reject, cleanup };
-          const index = targetIndexes.get(id);
+          pendingReveal.current = task;
           initialized.current = true;
-          if (index !== undefined)
-            virtual.scrollToIndex(index, { align: 'center', behavior: 'auto' });
-          settle();
+          startTargetScroll();
+          resolveVisibleTarget();
         }),
     }),
-    [settle, targetIndexes, virtual],
+    [cancelReveal, latest, startTargetScroll, resolveVisibleTarget],
   );
   useLayoutEffect(() => {
+    startTargetScroll();
     const anchor = widthAnchor.current;
-    if (anchor) {
+    if (anchor && !pendingReveal.current) {
+      widthAnchor.current = null;
       const index = indexes.get(anchor.key);
       const position = index === undefined ? undefined : virtual.getOffsetForIndex(index, 'start');
       if (position) virtual.scrollToOffset(position[0] + anchor.offset, { behavior: 'auto' });
-      widthAnchor.current = null;
     }
     if (focused && !indexes.has(focused)) container.current?.focus({ preventScroll: true });
     if (rows.length && !initialized.current && !targetActive) {
       initialized.current = true;
       virtual.scrollToEnd({ behavior: 'auto' });
     }
-    settle();
-  });
+    resolveVisibleTarget();
+  }, [
+    virtualItems,
+    indexes,
+    focused,
+    rows.length,
+    targetActive,
+    startTargetScroll,
+    resolveVisibleTarget,
+    virtual,
+  ]);
   useEffect(() => {
     const element = container.current;
     if (!element) return;
@@ -155,22 +213,18 @@ export const MeasuredStream = forwardRef<
       if (width !== element.clientWidth) {
         width = element.clientWidth;
         const item = virtual.getVirtualItemForOffset(element.scrollTop);
-        if (item)
+        if (item && !pendingReveal.current)
           widthAnchor.current = { key: String(item.key), offset: element.scrollTop - item.start };
         virtual.measure();
       }
-      settle();
+      resolveVisibleTarget();
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [virtual, settle]);
+  }, [virtual, resolveVisibleTarget]);
   useEffect(
-    () => () => {
-      pending.current?.cleanup();
-      pending.current?.reject(new DOMException('Viewport disposed', 'AbortError'));
-      pending.current = null;
-    },
-    [],
+    () => () => cancelReveal(new DOMException('Viewport disposed', 'AbortError'), false),
+    [cancelReveal],
   );
   return (
     <>
@@ -178,10 +232,8 @@ export const MeasuredStream = forwardRef<
         <button
           className="incident-button stream-new-updates"
           onClick={() => {
-            goLatest?.();
-            virtual.scrollToEnd({ behavior: 'auto' });
-            nearEnd.current = true;
-            setUpdates([]);
+            if (goLatest) goLatest();
+            else latest();
           }}
         >
           {label === 'Thread' ? 'New replies' : 'New updates'} ({updates.length})
@@ -192,6 +244,11 @@ export const MeasuredStream = forwardRef<
         className="timeline-viewport"
         tabIndex={0}
         aria-label={`${label} viewport`}
+        onWheel={interruptNavigation}
+        onTouchMove={interruptNavigation}
+        onPointerDown={(event) => {
+          if (event.target === event.currentTarget) interruptNavigation();
+        }}
         onKeyDown={(event) => {
           if (
             event.target !== event.currentTarget ||
@@ -200,15 +257,18 @@ export const MeasuredStream = forwardRef<
             event.ctrlKey
           )
             return;
+          if (
+            !['Home', 'End', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', ' '].includes(event.key)
+          )
+            return;
+          interruptNavigation();
           if (event.key !== 'Home' && event.key !== 'End') return;
           event.preventDefault();
-          // Let the virtualizer reconcile variable heights after an explicit keyboard jump.
-          widthAnchor.current = null;
           if (event.key === 'Home') virtual.scrollToIndex(0, { align: 'start', behavior: 'auto' });
-          else virtual.scrollToEnd({ behavior: 'auto' });
+          else latest();
         }}
         onScroll={() => {
-          settle();
+          resolveVisibleTarget();
           const node = container.current;
           nearEnd.current = !!node && node.scrollHeight - node.clientHeight - node.scrollTop <= 96;
           if (nearEnd.current && !targetActive)
@@ -226,7 +286,7 @@ export const MeasuredStream = forwardRef<
           aria-label={`${label} entries`}
           style={{ height: virtual.getTotalSize(), position: 'relative', margin: 0, padding: 0 }}
         >
-          {virtual.getVirtualItems().map((item) => {
+          {virtualItems.map((item) => {
             const row = rows[item.index]!;
             return (
               <li
@@ -236,14 +296,7 @@ export const MeasuredStream = forwardRef<
                 data-index={item.index}
                 aria-posinset={item.index + 1}
                 aria-setsize={rows.length}
-                ref={(node) => {
-                  virtual.measureElement(node);
-                  if (row.entry) {
-                    if (node) mounted.current.set(row.entry.id, node);
-                    else mounted.current.delete(row.entry.id);
-                  }
-                  if (node) queueMicrotask(settle);
-                }}
+                ref={virtual.measureElement}
                 className={`timeline-row ${highlight && row.entry?.id === highlight ? 'timeline-target' : ''}`}
                 style={{
                   position: 'absolute',

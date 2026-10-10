@@ -335,7 +335,9 @@ export function TimelineRoom({
         setHighlight(id);
       },
     );
-    return () => navigation.cancel();
+    return () => {
+      navigation.cancel();
+    };
   }, [target, targetAttempt, navigation, coordinator, adapter, root, loadWindow, cache]);
   useEffect(() => {
     if (!highlight) return;
@@ -474,6 +476,11 @@ export function TimelineRoom({
           targetId={target}
           newEntryIds={realtime.arrivals}
           goLatest={goLatest}
+          onUserScroll={() => {
+            if (!navigation.cancel()) return;
+            setHighlight(null);
+            setNavigationStatus('Timeline target navigation cancelled.');
+          }}
           writable={writable}
           renderThread={(entry) => (
             <ThreadSummary

@@ -372,7 +372,9 @@ export function ThreadSurface({
         setHighlight(id);
       },
     );
-    return () => navigation.cancel();
+    return () => {
+      navigation.cancel();
+    };
   }, [target, targetAttempt, rootQuery.isSuccess, navigation, read, api, loadWindow]);
   useEffect(() => {
     if (!highlight) return;
@@ -610,6 +612,11 @@ export function ThreadSurface({
         targetId={target}
         newEntryIds={arrivals}
         goLatest={goLatest}
+        onUserScroll={() => {
+          if (!navigation.cancel()) return;
+          setHighlight(null);
+          setNavigationStatus('Thread target navigation cancelled.');
+        }}
         renderRow={(position) => {
           const row = rows[position]!;
           return row.entry ? (

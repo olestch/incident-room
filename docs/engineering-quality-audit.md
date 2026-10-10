@@ -1,0 +1,149 @@
+# Engineering quality audit
+
+Audit date: 2026-10-10. Baseline: b4d1b4022852df08b8d1b3d8b8c95d796bdcd8b8, clean `main`, matching `origin/main`. Scope is architecture remediation, not feature development. Product Specification and clean-room rules remain authoritative.
+
+## Executive summary
+
+The application has useful existing boundaries: Query owns confirmed resources, Redux owns serializable coordination, runtime classes own asynchronous work, and identity-scoped IndexedDB owns local drafts/outbox. The most urgent confirmed issue is that user scroll intent does not cancel route-owned target acquisition. A delayed target can therefore move the viewport after the reader deliberately moves elsewhere. MeasuredStream also repeats target scroll commands from readiness callbacks even though the installed virtualizer already reconciles variable-height navigation.
+
+The reported target-free mobile backward jump is **unresolved**. All 14 existing production scroll-stability tests pass on the baseline. Their coverage includes 320/375/390/430/1280px, late first measurements, actual touch gestures, prepend, viewport height changes and later growth below the fold. A reproducible stale-target defect is not proof that it caused every reported jump.
+
+Findings: **0 Critical, 1 High, 7 Medium, 2 Low**. Severity reflects behavioral impact and maintenance risk, not component length. Implement H1 and related M1/M2/M7; retain M3 based on regression evidence; address M4 as a separate storage reuse change if validation supports it. Defer performance/storage-scale changes and product decisions.
+
+## Architecture overview and inspection coverage
+
+The tracked file inventory covers routes/providers/shell, incident discovery/context, Timeline/Thread, session, realtime, search/notifications/palette, Postmortem, Demo, shared UI/messaging/persistence/query, fixtures, tests, CSS, tooling and CI. Detailed source review concentrated on stateful boundaries and their tests; inventory inspection is not a claim of an exhaustive formal proof of every line.
+
+- `app → features → entities → shared` dependencies are lint-enforced. Route wrappers await Next parameters; browser work lives inside client boundaries. Read the installed Next client-component and React Compiler guides. Compiler is not enabled in next.config.ts.
+- Query pages and target windows feed StreamProjection; Redux has session, connection, local-work metadata and Demo scalars. No competing confirmed-resource collection was identified in Redux.
+- SessionCoordinator owns generation checks, refresh coalescing, identity teardown and non-replayable mutations. LocalWorkService quarantines leases and drains transactions before explicit logout deletion. MessageDelivery associates confirmation with Query before removing durable local work, retains stable mutation identity and never blindly replays restore.
+- RealtimeCoordinator owns one transport, buffer, checkpoint-after-apply, recovery deadline and backoff. Workspace and Room hooks supply different cache/presence ports. Closed Thread histories are invalidated instead of eagerly loaded. Journal/source ingestion uses durable receipts because the separate authority databases are not globally atomic.
+- RHF owns editable Postmortem fields; revision/CAS and explicit reload preserve dirty fields. URL owns filters/search and contextual targets. Drawers own presentation/modality; they do not own Room services.
+- Authorities enforce domain permissions, cursor binding and idempotency. MSW composes authentication and domains. Fictional correlation cookies and in-memory ephemeral Service Worker presence are intentionally not production security.
+- Unit tests cover authority/delivery/session/realtime races; real browser suites cover geometry, cross-client convergence, accessibility interactions, large fixtures and development Strict Mode replay. jsdom layout stubs cannot certify scrolling.
+
+## Findings
+
+### H1 — User intent cannot cancel in-flight target acquisition
+
+**Type:** confirmed behavioral defect. **Severity:** High. **Files/functions:** shared/ui/measured-stream.tsx (viewport input); app/_incidents/timeline-room.tsx and thread-surface.tsx (target navigation effects); shared/messaging/target-navigation.ts (navigate/cancel).
+
+**Evidence:** new deterministic production reproduction sets the Timeline authority locator delay to 1000ms, requests evt-42 through URL, dispatches genuine mobile touch movement while locating, then observes `Target found in Timeline` and old evt-42 in the viewport. Baseline mobile 375px run fails 1/1 cancellation regression. Existing cancellation handles URL replacement/unmount/Latest only; no user-input handler cancels the owner. There are two independent pending operations: acquisition in TargetNavigation and reveal in MeasuredStream. Cancelling only reveal cannot stop acquisition from later starting reveal.
+
+**Why it matters:** readers can be pulled into older history after choosing another position. **Change:** scroll intent cancels both the route acquisition and pending reveal, preserves the URL so explicit Retry remains available, and clears pending resize restoration. Mouse/touch/scroll keys must count as intent; programmatic scroll events must not. **Benefit:** explicit ownership and correct cleanup. **Regression risk:** accidental cancellation from clicks on row controls; handle only viewport scrolling input. **Disposition:** fix now. This is a demonstrated target-related cause, not established as the cause of target-free reports.
+
+### M1 — Readiness callbacks also initiate repeated target movement
+
+**Type:** architectural concern with competing side effects. **Severity:** Medium. **Files/functions:** measured-stream.tsx, settle/reveal/layout/ResizeObserver/onScroll/row refs.
+
+**Evidence:** settle calls scrollToIndex before checking DOM visibility. It runs after scroll, layout, ResizeObserver and queued row-ref work; reveal also calls scrollToIndex separately. Installed Virtual 3.14.13 scrollToIndex schedules its own measurement reconciliation. Readiness and command initiation are therefore mixed.
+
+**Change:** issue one target command when its row index is acquired; let Virtual reconcile sizes; observe visibility to resolve the pending reveal. Centralize supersede/abort/Latest/unmount cleanup. **Benefit:** traceable scroll source, fewer command resets. **Risk:** resolving before a row mounts or measurements commit; retain layout/RO/scroll readiness signals. **Disposition:** fix with H1, behavioral reveal/supersede/unmount tests and full Timeline/Thread browser coverage.
+
+### M2 — Inline row refs repeat measurements and queue readiness work
+
+**Type:** architectural/performance concern, not measured FPS defect. **Severity:** Medium. **File:** measured-stream.tsx, inline li ref.
+
+**Evidence:** a new callback is created for each mounted row on every stream render; React detaches/attaches it, calls measureElement and queues a microtask per node. A separate mounted map only supports target visibility lookup, over a bounded rendered range.
+
+**Change:** use Virtual's stable measureElement ref and inspect the bounded mounted DOM only while a reveal is pending. **Benefit:** removes extra map lifecycle and microtask scheduling. **Risk:** target availability must be checked after layout and measurement; do not depend on row-ref churn. **Disposition:** fix with M1. No quantitative render-speed improvement claimed.
+
+### M3 — Custom size compensation is a version-specific maintenance constraint
+
+**Type:** version-specific ownership constraint; original-scroll hypothesis unconfirmed. **Severity:** Medium. **File:** measured-stream.tsx, shouldAdjustScrollPositionOnItemSizeChange.
+
+**Evidence:** current custom policy compensates first measurements whose start is above the fold and later measurements entirely above it. Installed Virtual implements those same cases by default and additionally skips later remeasure compensation while scrolling backward. The override suppresses that library guard and reads mutable implementation fields. Native browser anchoring is already disabled by globals.css overflow-anchor:none.
+
+**Change:** retain and explain the narrow predicate. Removing it failed the existing mobile above-fold growth test with 720px displacement, proving the difference is required. **Benefit:** explicit rationale instead of an unexplained workaround. **Risk:** dependency upgrades may change cache/scroll semantics; rerun real geometry regressions. **Disposition:** retain, document and defer removal. It is not yet a reproduced cause of the original target-free jump. Library source is the version-accurate evidence; [official Virtual API](https://tanstack.com/virtual/latest/docs/api/virtualizer) documents anchorTo/followOnAppend and measurement ownership.
+
+### M4 — Auth and Incident IndexedDB adapters duplicate the transaction primitive
+
+**Type:** duplicated responsibility. **Severity:** Medium. **Files/functions:** session/mock/indexeddb-authority.ts and incident-management/indexeddb-store.ts (open/transact), shared/persistence/atomic-store.ts.
+
+**Evidence:** all three implement cached version-1 opens, store creation, versionchange close, synchronous read/validate/operate/put, abort on callback error and resolve on transaction complete. Their actual differences are database/store/key, seed and validator. Other authorities already use IndexedDbAtomicStore.
+
+**Change:** keep public adapter classes and existing database/object-store/singleton keys; delegate transaction mechanics to the existing primitive, allowing its store name to be specified. Auth seed is asynchronous and must resolve before entering the synchronous transaction. **Benefit:** one place to maintain transaction/error behavior. **Risk:** persistence compatibility and transactional rollback; add real browser adapter reopen/rollback validation and run auth/incident suites. **Disposition:** focused separate batch after stream stabilization. Do not create a second persistence framework.
+
+### M5 — Bounded UI windows still incur whole-bucket authority work
+
+**Type:** confirmed structural performance concern, no latency benchmark. **Severity:** Medium. **Files/functions:** atomic-store.ts/transact; timeline/authority.ts/window/locate/inspectSearchable; threads/authority.ts/materialize/window; realtime/journal.ts/read; app/_mocks/search-authority.ts.
+
+**Evidence:** reads use readwrite transactions, validate a complete bucket and store.put it again. Timeline windows return <=60 entries while validation/serialization touches up to 50k. Thread window sorts the whole materialized discussion; Search scans accessible room buckets. Journal reads similarly write back. Bounded DOM does not bound storage work.
+
+**Change:** profile transactions and allocations on 50k with multiple clients before designing read-only access/indexes. Preserve authority mutation and seed materialization semantics. **Benefit:** evidence-based scaling improvement. **Risk:** splitting stores/indexes entails data migration and recovery changes. **Disposition:** defer; this audit does not justify a cross-cutting storage redesign or invented FPS claims.
+
+### M6 — Mounted-session acquired resource bookkeeping grows over time
+
+**Type:** performance/ownership concern. **Severity:** Medium. **Files/functions:** shared/messaging/projection.ts/build (index/aliases); use-room-realtime.ts/merge/arrivals/counted; measured-stream.tsx (counted/updates); realtime/coordinator.ts (revisions); TimelineRoom/ThreadSurface windowIds.
+
+**Evidence:** acquired entries/aliases/target window IDs and realtime acknowledgment/arrival collections are retained during mount; not all follow Query gcTime. Realtime seen has a 2000 cap, but resource revisions do not. Multiple deep targets and long-lived realtime sessions can increase these collections independently of rendered row count.
+
+**Change:** establish a supported acquisition/lifetime policy and profile a sustained session; then bound/evict with explicit gap and revision semantics. **Benefit:** predictable session memory. **Risk:** evicting acquired targets can break gaps, pending confirmations and ordering. **Disposition:** defer; avoid arbitrary caps that lose accepted behavior.
+
+### M7 — Cancellation/measurement ownership lacks direct regression coverage
+
+**Type:** test coverage gap. **Severity:** Medium. **Files:** timeline/threads component tests, timeline.spec.ts, timeline-scroll-stability.spec.ts, dev-e2e/timeline-scroll.spec.ts.
+
+**Evidence:** existing tests cover URL supersede, Latest, touch after settled geometry and first measurement; they do not cover user input during acquisition or pending reveal, signal listener cleanup, or stable callback ref behavior. Geometry stubs deliberately return uniform sizes/positions and therefore cannot expose real scroll competition. No physical iOS/device test exists.
+
+**Change:** add deterministic delayed acquisition, pending reveal AbortSignal/unmount, keyboard cancellation, Thread compatibility, and real browser gesture regressions. **Benefit:** protects owner handoff instead of internal implementation shape. **Risk:** hard sleeps or optimistic visibility-only assertions could miss subsequent override; use authority barriers and geometry settling. **Disposition:** fix with H1–M3. Keep existing tests and assertions.
+
+### L1 — Documentation and annotations can overstate current implementation
+
+**Type:** documentation concern. **Severity:** Low. **Files:** technical-architecture.md section 22; measured-stream.tsx use-no-memo comment; next.config.ts; README testing counts.
+
+**Evidence:** section 22 describes generic explicit capture/restore before prepend, whereas prepend is now owned by Virtual anchorTo:end. React Compiler annotation exists but the compiler is not enabled. README baseline counts predate newer remediation tests.
+
+**Change:** document actual current scroll ownership and measured validation counts without erasing historical phase records. **Benefit:** fewer misleading assumptions during maintenance. **Risk:** cosmetic broad rewrite. **Disposition:** update scroll ownership only; retain compiler boundary as compatibility annotation, do not enable a new build plugin.
+
+### L2 — One development startup assertion uses a fixed observation delay
+
+**Type:** test maintenance concern. **Severity:** Low. **File:** tests/dev-e2e/session-startup.spec.ts (waitForTimeout(1500)).
+
+**Evidence:** fixed wait observes post-startup failures; it is not a readiness contract. Other stream tests use stable geometry and authority signals. **Change:** replace only when a meaningful startup-completion/idle condition is available; do not mechanically remove observation coverage. **Benefit:** clearer deterministic intent. **Risk:** deleting the wait could remove detection of delayed failures. **Disposition:** defer unrelated test cleanup.
+
+## Confirmed defects versus unresolved hypotheses
+
+H1 is reproducible. M1–M4 describe verified code structures; M5/M6 describe concrete work/retention patterns, not measured user-visible failures. M3's possible role in target-free backwards motion remains a hypothesis. No confirmed Critical defect was established. No evidence justified replacing core libraries, Redux/Query ownership, outbox protocol, permission model or UI.
+
+The target-free mobile issue remains open pending reproduction beyond the passing baseline. Native anchoring is disabled; instrument Virtual scrollToFn adjustments separately from absolute target/Latest/resize writes and track row-key visual offset, not scrollTop alone. Test Chromium touch and physical iOS momentum separately. A compensated prepend legitimately changes scrollTop while retaining the visual row anchor.
+
+## Scroll ownership model and mechanism review
+
+| Situation                    | Owner                                                      | Priority / handoff                                                                                                                                   |
+| ---------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ordinary user scroll         | Native viewport input                                      | Cancels acquisition and reveal; never infer intent from onScroll because it also observes programmatic writes.                                       |
+| Initial positioning          | Stream, once                                               | Initial Latest only without URL target; input marks initialization consumed.                                                                         |
+| Older history prepend        | Virtual anchorTo:end                                       | Stable logical keys preserve visible row; no second app prepend restorer.                                                                            |
+| Target navigation            | Route TargetNavigation acquisition + stream single command | New target supersedes old; signal abort/unmount/input cancels; readiness observes DOM visibility.                                                    |
+| Explicit Latest / Home / End | Explicit viewport action                                   | Cancels pending reveal/restoration first. Latest route callback clears only target URL dimensions.                                                   |
+| Append near end              | Virtual followOnAppend:auto                                | Suppressed while URL target active; never overrides historical reading.                                                                              |
+| Row height changes           | Virtual measurement/default compensation                   | Retain the narrow predicate for above-fold late growth; first estimate correction differs from later growth. Virtual alone executes compensation.    |
+| Width change                 | Stream keyed resize anchor + Virtual measure               | Essential because cached heights belong to old wrapping width. Restore once; active target takes precedence; user intent clears stale resize anchor. |
+| Container height change      | Virtual viewport observation                               | Avoid a second custom absolute scroll source.                                                                                                        |
+| Focus / new entries          | Stream UI state                                            | Range extractor retains focused row; distinct arrivals count only while reading history; presentation state does not command ordinary scrolling.     |
+
+`pending` is essential for the reveal Promise/AbortSignal boundary, but repeated settle scroll commands are not. `initialized` prevents repeated initial positioning. `nearEnd` remains necessary for the new-updates presentation, while Virtual independently owns follow geometry; do not introduce a third state owner. `widthAnchor` is needed for width invalidation, not prepend. `anchorTo` and `followOnAppend` are essential library responsibilities. Focus retention and keyboard navigation remain. Replace inline refs with stable measurement refs. A small cohesive component remains preferable to mutually dependent hooks or a generic state machine.
+
+## Dependency-aware remediation plan (written before structural changes)
+
+1. **Navigation owner handoff (H1/M1/M2/M7).** Current: acquisition and repeated reveal writes outlive user intent. Intended: cancelable acquisition plus one measured target command. Scope: stream, Timeline wrapper, route owners and focused tests. Preserve URL/API contracts; add explicit cancellation feedback/Retry. Risk: effect ordering/Strict Mode and input on nested controls. Verify delayed genuine touch/wheel at 320/375/390, reveal signal cancellation/supersede/unmount, keyboard Home/End, target retry/Latest, Thread and existing large-history regressions. Rollback: one stream/navigation commit.
+2. **Library measurement ownership experiment (M3).** Initial proposal: remove the overlap if tests permit. Outcome: mobile late-growth regression requires retaining the predicate; Virtual remains the only adjustment writer. Scope: stream only, existing late-first/later-growth/prepend suites plus focused backward movement. Risk: changing remeasure behavior. Verify before/after tests, retain override if behavior regresses. Can join batch 1 only if behavioral evidence remains clear; no dependency upgrade.
+3. **Existing transaction primitive reuse (M4).** Current: three duplicate adapters. Intended: preserve store/key/seed/schema while reusing one implementation. Scope: primitive + two wrappers + meaningful persistence regression. Risk: auth asynchronous seeding and persisted store compatibility. Verify reopen, rollback after thrown callback, corrupt input rejection, normal auth/incident flows and full suite. Independent commit/rollback from scrolling.
+4. **Delivery documentation.** Update this report with reproduction and actual validation; no claims for unexecuted checks. Run frozen install, formatting/lint/typecheck, full Vitest, production build, full production and relevant development Playwright, 10k/50k checks, diff review/check. Commit small batches only after project-required validation, push normally to main, inspect Actions, verify remote SHA and clean tree.
+
+## Deferred scope and quality assessment
+
+Do not split TimelineRoom/ThreadSurface solely because they are long. Draft flushing, send handoff, Query/URL composition and scope guarding are cohesive route responsibilities, although duplicated edit/flush orchestration should be reconsidered if another messaging surface is added. Existing shared MessageDelivery/StreamProjection/StreamCompose are justified by Timeline and Thread reuse. No speculative memoization or compiler enablement is warranted.
+
+Keep Postmortem CAS/dirty-copy logic, abort deadlines, journal recovery receipts, modal animation cancellation and identity leases: they correspond to explicit failure cases and tested requirements. Their complexity is justified rather than automatically overengineering. Accepted commander feature gaps and Postmortem browser Back/Forward dirty-loss limitations are already disclosed; implementing product features/history interception is outside this task.
+
+Expected improvement is qualitative: fewer independent target command paths, explicit user cancellation, an explained measurement policy, stable refs and fewer storage transaction copies. No fabricated percentage, FPS, memory or bundle improvements. Remaining medium debt needs sustained-session/storage profiles; the original target-free mobile report needs an actual reproducible gesture/measurement sequence.
+
+## Validation record
+
+Before implementation: frozen install passed; production build passed; 14/14 existing scroll-stability tests passed. New delayed-target mobile 375px regression failed 1/1 and captured `Target found in Timeline`/old target after genuine touch input. Screenshots and traces disabled. Final validation and final commit/CI evidence will be added after the remediation batches.
+
+## Measurement policy decision after browser experiment
+
+Removing the custom policy passed the late-first-measurement tests but failed the existing mobile test 'measured growth above a historical anchor compensates geometry without dragging the reader': displacement **720px**, allowed <=8px. The focused batch was **71 passed, 1 failed (72 total)**. The library default skips remeasurement compensation during backward movement, even for genuine above-fold content growth. Restore the narrow existing predicate; its behavioral difference is essential. M3 is therefore documented/deferred rather than removed. Do not attribute the original target-free mobile report to this override. The stream still has a single measurement owner (Virtual executes adjustments with the retained explicit predicate), not two independent compensating writers.

@@ -87,10 +87,13 @@ export class TargetNavigation {
       );
     } finally {
       clearTimeout(deadline);
+      if (this.current === controller) this.current = null;
     }
   }
   cancel() {
+    const active = this.current !== null;
     this.current?.abort();
     this.current = null;
+    return active;
   }
 }

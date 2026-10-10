@@ -230,6 +230,7 @@ export const TimelineList = forwardRef<
     renderThread?(entry: TimelineEntry): ReactNode;
     newEntryIds?: string[];
     goLatest?(): void;
+    onUserScroll?(): void;
   }
 >(function TimelineList(props, ref) {
   return (
@@ -242,6 +243,7 @@ export const TimelineList = forwardRef<
       targetId={props.targetId}
       newEntryIds={props.newEntryIds}
       goLatest={props.goLatest}
+      onUserScroll={props.onUserScroll}
       renderRow={(index) => {
         const row = props.rows[index]!;
         return row.entry ? (
