@@ -215,7 +215,15 @@ export const MeasuredStream = forwardRef<
         const item = virtual.getVirtualItemForOffset(element.scrollTop);
         if (item && !pendingReveal.current)
           widthAnchor.current = { key: String(item.key), offset: element.scrollTop - item.start };
+        // Replace any previous absolute navigation with this position before invalidation.
+        // This also keeps Virtual's synchronous measurement path active during resize.
+        if (!pendingReveal.current) virtual.scrollToOffset(element.scrollTop, { behavior: 'auto' });
         virtual.measure();
+        // Width invalidation requires fresh mounted sizes before restoring its anchor.
+        // Stable refs do not reattach on this render; measure this bounded range explicitly.
+        virtual.getVirtualItems();
+        for (const node of element.querySelectorAll<HTMLLIElement>('[data-index]'))
+          virtual.measureElement(node);
       }
       resolveVisibleTarget();
     });
