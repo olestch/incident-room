@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { stableViewport } from '@/shared/testing/stream-browser';
 
 const root = 'fictional-incident-2841:evt-4000';
 const timeline = (page: Page) => page.getByRole('region', { name: 'Timeline', exact: true });
@@ -128,14 +129,17 @@ test('resizing a historical reading anchor preserves measured positioning and la
 }) => {
   await room(page, 1440, 600);
   const viewport = timeline(page).getByLabel('Timeline viewport', { exact: true });
+  await stableViewport(viewport);
   await viewport.evaluate((element) => {
     element.scrollTop = 800;
   });
+  await stableViewport(viewport);
   const anchor = await viewport.evaluate((element) => {
     const top = element.getBoundingClientRect().top;
+    const fold = top + element.clientTop;
     const row = [...element.querySelectorAll<HTMLElement>('[data-entry-id]')].find(
       (item) =>
-        item.getBoundingClientRect().top <= top && item.getBoundingClientRect().bottom > top,
+        item.getBoundingClientRect().top <= fold && item.getBoundingClientRect().bottom > fold,
     )!;
     return { id: row.dataset.entryId!, offset: row.getBoundingClientRect().top - top };
   });
