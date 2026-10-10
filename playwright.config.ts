@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:3100',
-    trace: 'retain-on-failure',
+    trace: { mode: 'retain-on-failure', screenshots: false },
   },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
