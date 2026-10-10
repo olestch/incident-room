@@ -18,12 +18,13 @@ export class IndexedDbAtomicStore<T> implements AtomicStore<T> {
     private readonly name: string,
     private readonly seed: (key: string) => T,
     private readonly validate: (value: unknown) => T,
+    private readonly storeName = 'records',
   ) {}
   private open() {
     if (!this.database)
       this.database = new Promise((resolve, reject) => {
         const request = indexedDB.open(this.name, 1);
-        request.onupgradeneeded = () => request.result.createObjectStore('records');
+        request.onupgradeneeded = () => request.result.createObjectStore(this.storeName);
         request.onsuccess = () => {
           const db = request.result;
           db.onversionchange = () => {
@@ -42,8 +43,8 @@ export class IndexedDbAtomicStore<T> implements AtomicStore<T> {
   async transact<R>(key: string, operation: (data: T) => R): Promise<R> {
     const db = await this.open();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction('records', 'readwrite');
-      const store = transaction.objectStore('records');
+      const transaction = db.transaction(this.storeName, 'readwrite');
+      const store = transaction.objectStore(this.storeName);
       const request = store.get(key);
       let result: R;
       let failure: unknown;
