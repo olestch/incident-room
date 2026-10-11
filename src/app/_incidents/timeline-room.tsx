@@ -8,6 +8,8 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ScrollDebugProvider } from '@/shared/diagnostics/use-scroll-debug';
+import { scrollDebugEnabled } from '@/shared/diagnostics/scroll-recorder';
 import { ArrowDownToLine, ArrowUpToLine, History, RotateCcw } from 'lucide-react';
 import { Button } from '@/shared/ui/primitives';
 import type { CurrentUser, WorkspaceUser } from '@/entities/current-user/model';
@@ -378,204 +380,218 @@ export function TimelineRoom({
     viewport.current?.latest();
   };
   return (
-    <div className={`thread-room-layout ${threadRoot !== null ? 'thread-room-open' : ''}`}>
-      {params.get('message') !== null && threadRoot === null && (
-        <p role="alert">
-          Thread message link requires a root Thread. The Timeline remains available.
-        </p>
-      )}
-      <section ref={timelineSection} aria-labelledby="timeline-heading" className="room-timeline">
-        <div className="room-stream-heading">
-          <h2 id="timeline-heading">Timeline</h2>
-          <div className="room-history-actions">
-            {target !== null && !highlight && !navigationStatus.startsWith('Locating') && (
-              <button
-                className="incident-button room-latest room-target-retry"
-                aria-label="Retry target"
-                title="Retry target"
-                onClick={() => setTargetAttempt((attempt) => attempt + 1)}
-              >
-                <RotateCcw size={16} aria-hidden="true" />
-              </button>
-            )}
-            {history.hasNextPage && (
-              <Button
-                className="room-event-action"
-                aria-label="Load earlier events"
-                aria-busy={history.isFetchingNextPage}
-                disabled={history.isFetching}
-                onClick={() => void history.fetchNextPage({ cancelRefetch: false })}
-              >
+    <ScrollDebugProvider
+      enabled={scrollDebugEnabled(process.env.NODE_ENV, params.get('scrollDebug'))}
+    >
+      <div className={`thread-room-layout ${threadRoot !== null ? 'thread-room-open' : ''}`}>
+        {params.get('message') !== null && threadRoot === null && (
+          <p role="alert">
+            Thread message link requires a root Thread. The Timeline remains available.
+          </p>
+        )}
+        <section ref={timelineSection} aria-labelledby="timeline-heading" className="room-timeline">
+          <div className="room-stream-heading">
+            <h2 id="timeline-heading">Timeline</h2>
+            <div className="room-history-actions">
+              {target !== null && !highlight && !navigationStatus.startsWith('Locating') && (
+                <button
+                  className="incident-button room-latest room-target-retry"
+                  aria-label="Retry target"
+                  title="Retry target"
+                  onClick={() => setTargetAttempt((attempt) => attempt + 1)}
+                >
+                  <RotateCcw size={16} aria-hidden="true" />
+                </button>
+              )}
+              {history.hasNextPage && (
+                <Button
+                  className="room-event-action"
+                  aria-label="Load earlier events"
+                  aria-busy={history.isFetchingNextPage}
+                  disabled={history.isFetching}
+                  onClick={() => void history.fetchNextPage({ cancelRefetch: false })}
+                >
+                  <span className="room-event-control" aria-hidden="true">
+                    <History className="room-event-desktop-icon" size={14} />
+                    <ArrowUpToLine className="room-event-mobile-icon" size={14} />
+                    <span className="room-event-full-label">
+                      {history.isFetchingNextPage ? 'Loading events…' : 'Load earlier events'}
+                    </span>
+                    <span className="room-event-short-label">
+                      {history.isFetchingNextPage ? 'Loading…' : 'Earlier'}
+                    </span>
+                  </span>
+                </Button>
+              )}
+              <Button className="room-event-action" aria-label="Jump to latest" onClick={goLatest}>
                 <span className="room-event-control" aria-hidden="true">
-                  <History className="room-event-desktop-icon" size={14} />
-                  <ArrowUpToLine className="room-event-mobile-icon" size={14} />
-                  <span className="room-event-full-label">
-                    {history.isFetchingNextPage ? 'Loading events…' : 'Load earlier events'}
-                  </span>
-                  <span className="room-event-short-label">
-                    {history.isFetchingNextPage ? 'Loading…' : 'Earlier'}
-                  </span>
+                  <ArrowDownToLine size={14} />
+                  <span className="room-event-full-label">Jump to latest</span>
+                  <span className="room-event-short-label">Latest</span>
                 </span>
               </Button>
-            )}
-            <Button className="room-event-action" aria-label="Jump to latest" onClick={goLatest}>
-              <span className="room-event-control" aria-hidden="true">
-                <ArrowDownToLine size={14} />
-                <span className="room-event-full-label">Jump to latest</span>
-                <span className="room-event-short-label">Latest</span>
-              </span>
-            </Button>
+            </div>
           </div>
-        </div>
-        <RealtimeSummary
-          status={realtime.status}
-          members={realtime.members}
-          users={users}
-          userId={actor.id}
-          retry={realtime.retry}
-        />
-        {navigationStatus && (
-          <div className="room-navigation-feedback">
-            <p role="status">{navigationStatus}</p>
-          </div>
-        )}
-        {history.isPending && <p role="status">Loading Timeline…</p>}
-        {history.isError && (
-          <div role="alert">
-            <p>
-              {denied
-                ? history.error instanceof AppError && history.error.category === 'authorization'
-                  ? 'Timeline access denied.'
-                  : 'Timeline unavailable.'
-                : 'Unable to load Timeline history.'}
-            </p>
-            <button
-              className="incident-button"
-              onClick={() =>
-                void (history.isFetchNextPageError
-                  ? history.fetchNextPage({ cancelRefetch: false })
-                  : history.refetch())
-              }
-            >
-              Retry history
-            </button>
-          </div>
-        )}
-        {history.data && !history.hasNextPage && (
-          <p className="text-sm">Beginning of loaded history</p>
-        )}
-        {history.data && rows.length === 0 && (
-          <p>No Timeline entries yet. The first message will start this incident history.</p>
-        )}
-        <TimelineList
-          ref={viewport}
-          rows={denied ? [] : rows}
-          users={users}
-          highlight={highlight}
-          targetActive={target !== null}
-          targetId={target}
-          newEntryIds={realtime.arrivals}
-          goLatest={goLatest}
-          onUserScroll={() => {
-            if (!navigation.cancel()) return;
-            setHighlight(null);
-            setNavigationStatus('Timeline target navigation cancelled.');
-          }}
-          writable={writable}
-          renderThread={(entry) => (
-            <ThreadSummary
-              root={entry.id}
-              incident={incident}
-              actor={actor}
-              users={users}
-              open={openThread}
-            />
+          <RealtimeSummary
+            status={realtime.status}
+            members={realtime.members}
+            users={users}
+            userId={actor.id}
+            retry={realtime.retry}
+          />
+          {navigationStatus && (
+            <div className="room-navigation-feedback">
+              <p role="status">{navigationStatus}</p>
+            </div>
           )}
-          retry={(id) => act(delivery.retry(id))}
-          check={(id) => act(delivery.check(id))}
-          remove={(id) => act(delivery.remove(id))}
-          loadGap={(cursor) => {
-            void loadWindow(`gap:${cursor}`, cursor).catch(() =>
-              setIssue('Unable to load history gap. Try that gap again.'),
-            );
-          }}
-        />
-        {!writable && issue && <p role="alert">{issue}</p>}
-        <TimelineTyping members={realtime.members} users={users} userId={actor.id} />
-        <TimelineCompose
-          body={body}
-          edit={edit}
-          users={users}
-          ready={ready}
-          busy={busy}
-          writable={writable}
-          resolved={incident.status === 'resolved'}
-          issue={issue}
-          discard={() => {
-            if (timer.current) clearTimeout(timer.current);
-            void work
-              .draft(lease, '')
-              .then(() => {
-                latestBody.current = '';
-                dirty.current = false;
-                setBody('');
-                setIssue(null);
-              })
-              .catch(() => setIssue('Draft could not be discarded.'));
-          }}
-          send={() => {
-            if (preparing.current || busy || !writable) return;
-            preparing.current = true;
-            realtime.typing(false);
-            setBusy(true);
-            setIssue(null);
-            if (timer.current) clearTimeout(timer.current);
-            void delivery
-              .prepare(latestBody.current)
-              .then((record) => {
-                latestBody.current = '';
-                dirty.current = false;
-                preparing.current = false;
-                setBody('');
-                setBusy(false);
-                act(delivery.exposeAndSend(record));
-              })
-              .catch(() => {
-                preparing.current = false;
-                setBusy(false);
-                setIssue(
-                  'Message could not be saved locally. Your text remains in the editor; nothing was sent.',
-                );
-              });
-          }}
-        />
-      </section>
-      {threadRoot !== null && (
-        <ThreadSurface
-          key={threadRoot}
-          root={threadRoot}
-          incident={incident}
-          actor={actor}
-          users={users}
-          members={realtime.members}
-          threadPortRef={threadPort}
-          typing={realtime.typing}
-          status={realtime.status}
-          retryConnection={realtime.retry}
-          close={() => {
-            if (ownedThread.current === threadRoot && params.get('message') === null) router.back();
-            else router.replace(threadHref(new URL(window.location.href), null), { scroll: false });
-          }}
-          viewRoot={() => {
-            const url = new URL(window.location.href);
-            url.searchParams.set('event', threadRoot);
-            url.searchParams.delete('thread');
-            url.searchParams.delete('message');
-            ownedThread.current = null;
-            router.push(`${url.pathname}?${url.searchParams}${url.hash}`, { scroll: false });
-          }}
-        />
-      )}
-    </div>
+          {history.isPending && <p role="status">Loading Timeline…</p>}
+          {history.isError && (
+            <div role="alert">
+              <p>
+                {denied
+                  ? history.error instanceof AppError && history.error.category === 'authorization'
+                    ? 'Timeline access denied.'
+                    : 'Timeline unavailable.'
+                  : 'Unable to load Timeline history.'}
+              </p>
+              <button
+                className="incident-button"
+                onClick={() =>
+                  void (history.isFetchNextPageError
+                    ? history.fetchNextPage({ cancelRefetch: false })
+                    : history.refetch())
+                }
+              >
+                Retry history
+              </button>
+            </div>
+          )}
+          {history.data && !history.hasNextPage && (
+            <p className="text-sm">Beginning of loaded history</p>
+          )}
+          {history.data && rows.length === 0 && (
+            <p>No Timeline entries yet. The first message will start this incident history.</p>
+          )}
+          <TimelineList
+            ref={viewport}
+            rows={denied ? [] : rows}
+            debugState={() => ({
+              paginationLoading: history.isFetchingNextPage,
+              paginationFetching: history.isFetching,
+              paginationComplete: history.isSuccess && !history.hasNextPage,
+              historyPages: history.data?.pages.length ?? 0,
+              acquiredWindows: targetWindows.length,
+              targetNavigationActive: navigation.active,
+            })}
+            users={users}
+            highlight={highlight}
+            targetActive={target !== null}
+            targetId={target}
+            newEntryIds={realtime.arrivals}
+            goLatest={goLatest}
+            onUserScroll={() => {
+              if (!navigation.cancel()) return;
+              setHighlight(null);
+              setNavigationStatus('Timeline target navigation cancelled.');
+            }}
+            writable={writable}
+            renderThread={(entry) => (
+              <ThreadSummary
+                root={entry.id}
+                incident={incident}
+                actor={actor}
+                users={users}
+                open={openThread}
+              />
+            )}
+            retry={(id) => act(delivery.retry(id))}
+            check={(id) => act(delivery.check(id))}
+            remove={(id) => act(delivery.remove(id))}
+            loadGap={(cursor) => {
+              void loadWindow(`gap:${cursor}`, cursor).catch(() =>
+                setIssue('Unable to load history gap. Try that gap again.'),
+              );
+            }}
+          />
+          {!writable && issue && <p role="alert">{issue}</p>}
+          <TimelineTyping members={realtime.members} users={users} userId={actor.id} />
+          <TimelineCompose
+            body={body}
+            edit={edit}
+            users={users}
+            ready={ready}
+            busy={busy}
+            writable={writable}
+            resolved={incident.status === 'resolved'}
+            issue={issue}
+            discard={() => {
+              if (timer.current) clearTimeout(timer.current);
+              void work
+                .draft(lease, '')
+                .then(() => {
+                  latestBody.current = '';
+                  dirty.current = false;
+                  setBody('');
+                  setIssue(null);
+                })
+                .catch(() => setIssue('Draft could not be discarded.'));
+            }}
+            send={() => {
+              if (preparing.current || busy || !writable) return;
+              preparing.current = true;
+              realtime.typing(false);
+              setBusy(true);
+              setIssue(null);
+              if (timer.current) clearTimeout(timer.current);
+              void delivery
+                .prepare(latestBody.current)
+                .then((record) => {
+                  latestBody.current = '';
+                  dirty.current = false;
+                  preparing.current = false;
+                  setBody('');
+                  setBusy(false);
+                  act(delivery.exposeAndSend(record));
+                })
+                .catch(() => {
+                  preparing.current = false;
+                  setBusy(false);
+                  setIssue(
+                    'Message could not be saved locally. Your text remains in the editor; nothing was sent.',
+                  );
+                });
+            }}
+          />
+        </section>
+        {threadRoot !== null && (
+          <ThreadSurface
+            key={threadRoot}
+            root={threadRoot}
+            incident={incident}
+            actor={actor}
+            users={users}
+            members={realtime.members}
+            threadPortRef={threadPort}
+            typing={realtime.typing}
+            status={realtime.status}
+            retryConnection={realtime.retry}
+            close={() => {
+              if (ownedThread.current === threadRoot && params.get('message') === null)
+                router.back();
+              else
+                router.replace(threadHref(new URL(window.location.href), null), { scroll: false });
+            }}
+            viewRoot={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.set('event', threadRoot);
+              url.searchParams.delete('thread');
+              url.searchParams.delete('message');
+              ownedThread.current = null;
+              router.push(`${url.pathname}?${url.searchParams}${url.hash}`, { scroll: false });
+            }}
+          />
+        )}
+      </div>
+    </ScrollDebugProvider>
   );
 }

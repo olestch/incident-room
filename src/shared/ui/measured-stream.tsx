@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useScrollDebug, type ScrollDebugState } from '@/shared/diagnostics/use-scroll-debug';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import type { TimelineViewport } from '@/shared/messaging/target-navigation';
 export const MeasuredStream = forwardRef<
@@ -23,6 +24,7 @@ export const MeasuredStream = forwardRef<
     targetId?: string | null | undefined;
     newEntryIds?: string[] | undefined;
     goLatest?: (() => void) | undefined;
+    debugState?: (() => ScrollDebugState) | undefined;
     onUserScroll?: (() => void) | undefined;
   }
 >(function MeasuredStream(
@@ -36,6 +38,7 @@ export const MeasuredStream = forwardRef<
     newEntryIds = [],
     goLatest,
     onUserScroll,
+    debugState,
   },
   ref,
 ) {
@@ -97,6 +100,19 @@ export const MeasuredStream = forwardRef<
     return instance.itemSizeCache.has(item.key) ? item.end <= offset : item.start < offset;
   };
   const virtualItems = virtual.getVirtualItems();
+  const debugCommand = useScrollDebug(virtual, container, label, () => ({
+    items: virtualItems,
+    state: () => ({
+      ...debugState?.(),
+      loadedRows: rows.length,
+      urlTargetPresent: targetActive,
+      revealPending: pendingReveal.current !== null,
+      autoFollowConfigured: virtual.options.followOnAppend !== false,
+      nearEnd: nearEnd.current,
+      initialized: initialized.current,
+      resizeAnchorPending: widthAnchor.current !== null,
+    }),
+  }));
   const cancelReveal = useCallback(
     (reason: unknown, stopScroll = true) => {
       const task = pendingReveal.current;
@@ -104,10 +120,12 @@ export const MeasuredStream = forwardRef<
       task?.cleanup();
       // Virtual has no separate cancellation API. Replace its pending target once.
       if (stopScroll && task && task.index !== null && container.current)
-        virtual.scrollToOffset(container.current.scrollTop, { behavior: 'auto' });
+        debugCommand('scrollToOffset', 'cancel-reveal', container.current.scrollTop, () =>
+          virtual.scrollToOffset(container.current!.scrollTop, { behavior: 'auto' }),
+        );
       task?.reject(reason);
     },
-    [virtual],
+    [virtual, debugCommand],
   );
   // Readiness observes the bounded mounted range; it never issues a scroll command.
   const resolveVisibleTarget = useCallback(() => {
@@ -134,16 +152,20 @@ export const MeasuredStream = forwardRef<
     task.index = index;
     widthAnchor.current = null;
     // Command once per acquired index (prepend may move it); Virtual reconciles row sizes.
-    virtual.scrollToIndex(index, { align: 'center', behavior: 'auto' });
-  }, [targetIndexes, virtual]);
+    debugCommand('scrollToIndex', 'target-navigation', index, () =>
+      virtual.scrollToIndex(index, { align: 'center', behavior: 'auto' }),
+    );
+  }, [targetIndexes, virtual, debugCommand]);
   const latest = useCallback(() => {
     cancelReveal(new DOMException('Latest requested', 'AbortError'));
     widthAnchor.current = null;
     initialized.current = true;
     nearEnd.current = true;
     setUpdates([]);
-    virtual.scrollToEnd({ behavior: 'auto' });
-  }, [cancelReveal, virtual]);
+    debugCommand('scrollToEnd', 'explicit-latest', null, () =>
+      virtual.scrollToEnd({ behavior: 'auto' }),
+    );
+  }, [cancelReveal, virtual, debugCommand]);
   const interruptNavigation = () => {
     cancelReveal(new DOMException('User took scroll control', 'AbortError'));
     widthAnchor.current = null;
@@ -187,12 +209,17 @@ export const MeasuredStream = forwardRef<
       widthAnchor.current = null;
       const index = indexes.get(anchor.key);
       const position = index === undefined ? undefined : virtual.getOffsetForIndex(index, 'start');
-      if (position) virtual.scrollToOffset(position[0] + anchor.offset, { behavior: 'auto' });
+      if (position)
+        debugCommand('scrollToOffset', 'width-anchor-restore', position[0] + anchor.offset, () =>
+          virtual.scrollToOffset(position[0] + anchor.offset, { behavior: 'auto' }),
+        );
     }
     if (focused && !indexes.has(focused)) container.current?.focus({ preventScroll: true });
     if (rows.length && !initialized.current && !targetActive) {
       initialized.current = true;
-      virtual.scrollToEnd({ behavior: 'auto' });
+      debugCommand('scrollToEnd', 'initial-position', null, () =>
+        virtual.scrollToEnd({ behavior: 'auto' }),
+      );
     }
     resolveVisibleTarget();
   }, [
@@ -204,6 +231,7 @@ export const MeasuredStream = forwardRef<
     startTargetScroll,
     resolveVisibleTarget,
     virtual,
+    debugCommand,
   ]);
   useEffect(() => {
     const element = container.current;
@@ -217,8 +245,11 @@ export const MeasuredStream = forwardRef<
           widthAnchor.current = { key: String(item.key), offset: element.scrollTop - item.start };
         // Replace any previous absolute navigation with this position before invalidation.
         // This also keeps Virtual's synchronous measurement path active during resize.
-        if (!pendingReveal.current) virtual.scrollToOffset(element.scrollTop, { behavior: 'auto' });
-        virtual.measure();
+        if (!pendingReveal.current)
+          debugCommand('scrollToOffset', 'width-measurement-handoff', element.scrollTop, () =>
+            virtual.scrollToOffset(element.scrollTop, { behavior: 'auto' }),
+          );
+        debugCommand('measure', 'width-invalidation', null, () => virtual.measure());
         // Width invalidation requires fresh mounted sizes before restoring its anchor.
         // Stable refs do not reattach on this render; measure this bounded range explicitly.
         virtual.getVirtualItems();
@@ -229,7 +260,7 @@ export const MeasuredStream = forwardRef<
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [virtual, resolveVisibleTarget]);
+  }, [virtual, resolveVisibleTarget, debugCommand]);
   useEffect(
     () => () => cancelReveal(new DOMException('Viewport disposed', 'AbortError'), false),
     [cancelReveal],
@@ -272,7 +303,10 @@ export const MeasuredStream = forwardRef<
           interruptNavigation();
           if (event.key !== 'Home' && event.key !== 'End') return;
           event.preventDefault();
-          if (event.key === 'Home') virtual.scrollToIndex(0, { align: 'start', behavior: 'auto' });
+          if (event.key === 'Home')
+            debugCommand('scrollToIndex', 'keyboard-home', 0, () =>
+              virtual.scrollToIndex(0, { align: 'start', behavior: 'auto' }),
+            );
           else latest();
         }}
         onScroll={() => {

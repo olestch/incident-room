@@ -19,6 +19,7 @@ import type { TimelineEntry } from '@/entities/timeline/model';
 import type { OutboxRecord } from './local-work';
 import type { TimelineRow } from './projection';
 import type { TimelineViewport } from './target-navigation';
+import type { ScrollDebugState } from '@/shared/diagnostics/use-scroll-debug';
 import { MeasuredStream } from '@/shared/ui/measured-stream';
 import { SafeText } from '@/shared/ui/safe-text';
 export { SafeText } from '@/shared/ui/safe-text';
@@ -230,6 +231,7 @@ export const TimelineList = forwardRef<
     renderThread?(entry: TimelineEntry): ReactNode;
     newEntryIds?: string[];
     goLatest?(): void;
+    debugState?: () => ScrollDebugState;
     onUserScroll?(): void;
   }
 >(function TimelineList(props, ref) {
@@ -243,6 +245,7 @@ export const TimelineList = forwardRef<
       targetId={props.targetId}
       newEntryIds={props.newEntryIds}
       goLatest={props.goLatest}
+      debugState={props.debugState}
       onUserScroll={props.onUserScroll}
       renderRow={(index) => {
         const row = props.rows[index]!;

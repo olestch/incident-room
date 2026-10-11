@@ -28,6 +28,9 @@ function abortable<T>(task: Promise<T>, signal: AbortSignal): Promise<T> {
 export class TargetNavigation {
   constructor(private readonly label = 'Timeline') {}
   private current: AbortController | null = null;
+  get active() {
+    return this.current !== null;
+  }
   async navigate(
     target: string,
     load: (signal: AbortSignal) => Promise<{ deleted: boolean }>,

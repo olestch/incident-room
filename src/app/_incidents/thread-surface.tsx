@@ -606,6 +606,14 @@ export function ThreadSurface({
       <MeasuredStream
         ref={viewport}
         rows={denied ? [] : rows}
+        debugState={() => ({
+          paginationLoading: history.isFetchingNextPage,
+          paginationFetching: history.isFetching,
+          paginationComplete: history.isSuccess && !history.hasNextPage,
+          historyPages: history.data?.pages.length ?? 0,
+          acquiredWindows: targets.length,
+          targetNavigationActive: navigation.active,
+        })}
         label="Thread"
         highlight={highlight}
         targetActive={target !== null}
