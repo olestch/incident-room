@@ -104,3 +104,39 @@ it('enabling and disabling diagnostics leaves pending target navigation intact',
   await task;
   expect(settled).toHaveBeenCalledOnce();
 });
+it('preserves Virtual no-ops for stale measurements after rows are removed', async () => {
+  const { Virtualizer, elementScroll } = await import('@tanstack/react-virtual');
+  const { ScrollRecorder } = await import('./scroll-recorder');
+  const { attachScrollDebug } = await import('./use-scroll-debug');
+  const element = document.createElement('div');
+  document.body.append(element);
+  const virtual = new Virtualizer<HTMLDivElement, HTMLLIElement>({
+    count: 1,
+    getScrollElement: () => element,
+    getItemKey: (index) => {
+      if (index !== 0) throw new Error('Removed row key accessed');
+      return 'row';
+    },
+    estimateSize: () => 100,
+    scrollToFn: elementScroll,
+    observeElementRect: () => undefined,
+    observeElementOffset: () => undefined,
+  });
+  const recorder = new ScrollRecorder();
+  recorder.start();
+  const original = virtual.resizeItem;
+  const dispose = attachScrollDebug(
+    { recorder, viewports: new Set() },
+    virtual,
+    element,
+    'Timeline',
+    { current: { items: [], state: () => ({}) } },
+    { current: () => {} },
+    { current: null },
+  );
+  expect(() => virtual.resizeItem(-1, 100)).not.toThrow();
+  expect(() => virtual.resizeItem(1, 100)).not.toThrow();
+  dispose();
+  expect(virtual.resizeItem).toBe(original);
+  element.remove();
+});

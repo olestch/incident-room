@@ -480,6 +480,8 @@ export function attachScrollDebug(
     }
     const originalResize = virtual.resizeItem;
     const wrappedResize: typeof originalResize = (index, size) => {
+      // Preserve Virtual's early no-op for stale/removed indexes before reading a row key.
+      if (!(index >= 0 && index < virtual.options.count)) return originalResize(index, size);
       const key = virtual.options.getItemKey(index);
       const oldSize = virtual.itemSizeCache.get(key) ?? null;
       if (oldSize !== size) {
