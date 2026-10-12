@@ -1,6 +1,6 @@
 # Production deployment
 
-Netlify is the owner's selected target. This repository is prepared for a normal Next.js deployment, not a static export. No hosted URL is available yet; repository preparation and local/CI success are not evidence of a successful Netlify deployment.
+**Readiness: Ready with documented configuration.** Netlify is the owner's selected target. This repository is prepared for a normal Next.js deployment, not a static export. No hosted URL is available yet; repository preparation and local/CI success are not evidence of a successful Netlify deployment.
 
 ## Netlify compatibility and build configuration
 
@@ -43,7 +43,11 @@ Same hostname/scheme/port and browser profile share IndexedDB across tabs; clien
 
 ## Verification boundary
 
-Local/CI Playwright use `next start`, not dev: production MSW, IndexedDB, auth restoration/reload, deep URLs, independent clients, journal recovery, Postmortem conflicts and Demo maintenance, including real 50k HTTP total plus bounded DOM. They validate the application, not Netlify's adapter/CDN deployment. Netlify CLI is not installed; no account linking, one-off CLI dependency or deployment was introduced merely to simulate a platform incompletely.
+Production Playwright suites use `next start`, not dev: production MSW, IndexedDB, auth restoration/reload, deep URLs, independent clients, journal recovery, Postmortem conflicts and Demo maintenance, including real 50k HTTP total plus bounded DOM. The separate development suite covers startup/effect replay and scrolling regressions. They validate the application, not Netlify's adapter/CDN deployment. Netlify CLI is not installed; no account linking, one-off CLI dependency or deployment was introduced merely to simulate a platform incompletely.
+
+## Known application limitation
+
+The core patch improves the reproduced wheel compensation path. Touch-like/drag scrolling can still move the viewport unexpectedly and remains unresolved; see [the patch maintenance guide](timeline-wheel-compensation.md). Hosted smoke checks and device testing must not be described as a complete mobile scrolling fix.
 
 ## Post-deployment HTTPS smoke checklist
 

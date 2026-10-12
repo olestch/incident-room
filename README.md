@@ -1,78 +1,126 @@
 # Incident Room
 
-Incident Room is a fictional realtime incident-coordination SaaS-style application built to demonstrate complex frontend architecture. It brings large dynamic histories, durable optimistic messaging, reconnect/resync and contextual navigation into one React product. Collaborative Postmortems demonstrate explicit conflict handling without CRDT/OT.
+Incident Room is a frontend portfolio application that models how a team investigates a technical incident: an operational Timeline, contextual discussions, and a shared postmortem. It uses fictional data and a browser-backed API simulation to demonstrate state ownership, durable optimistic messaging, and recovery from interrupted realtime delivery.
 
-**React 19 · Next.js 16 · TypeScript · Redux Toolkit · TanStack Query · TanStack Virtual · IndexedDB**
+This is a demo application, not a production incident management service.
 
-[Run locally](#local-development) · [Demo credentials](#demo-credentials) · [Architecture](docs/technical-architecture.md) · [Deployment guide](docs/deployment.md)
+[Getting started](#getting-started) · [Engineering highlights](#engineering-highlights) · [Architecture](docs/technical-architecture.md) · [Deployment guide](docs/deployment.md)
 
-Live deployment: pending; repository configuration is prepared for Netlify.
+## Live demo
 
-Quick start with Node **24** and pinned pnpm **11.19.0**:
+**Not deployed yet.** Netlify deployment is pending review. The live demo URL will be added here after deployment and HTTPS verification.
+
+## Screenshots
+
+Screenshots have not been committed. The planned visual overview is:
+
+| Screen                   | Capture instructions                                                                                                                                |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Incident list            | Sign in as River; capture `/app/incidents` at 1280 × 900 with the filters collapsed and Demo tools closed.                                          |
+| Incident Room and Thread | Open `/app/incidents/INC-2841?thread=fictional-incident-2841:evt-4000` at 1280 × 900; wait for Timeline and Thread content and the Connected state. |
+| Postmortem               | Open `/app/incidents/INC-2865/postmortem`, initiate the postmortem as River, and show the editor with one fictional Action Item at 1280 × 900.      |
+| Mobile Room              | Capture `/app/incidents/INC-2841` at 390 × 844 with incident context and Thread closed, showing Timeline and composer.                              |
+
+Use a fresh browser profile and default dataset for repeatable captures. Save app-only PNGs under `docs/screenshots/` and embed them here once reviewed. The current tests do not generate a screenshot gallery; a static capture does not verify mobile scrolling.
+
+## Key functionality
+
+- Fictional login, registration, session restoration/refresh, protected routes, and safe return navigation.
+- Incident creation, URL-owned filters/sort, cursor pagination, and participant-aware messaging.
+- Variable-height virtualized Timeline and Threads, durable drafts/outbox, delivery feedback, and deep links into unloaded history.
+- Simulated realtime updates, presence/typing, disconnect recovery, and recipient notifications.
+- Search across incidents, Timeline/Thread messages, and users; keyboard Command Palette.
+- Shared postmortem drafts with explicit save conflicts, evidence references, and Action Item assignment, due date, and status.
+
+## Technology stack
+
+Versions are pinned in [package.json](package.json) and [pnpm-lock.yaml](pnpm-lock.yaml).
+
+| Technology                            | Version                                        | Role                                                                                |
+| ------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Next.js / React                       | 16.3.8 / 19.3.0                                | App Router, server-rendered route composition, interactive client surfaces          |
+| TypeScript                            | 5.9.3                                          | Strict domain and runtime boundary contracts                                        |
+| Redux Toolkit / React Redux           | 2.13.0 / 9.3.0                                 | Serializable session, connection, local-work coordination, and Demo configuration   |
+| TanStack Query                        | 5.104.1                                        | Confirmed resources, cursor queries, cancellation, and revision-aware cache updates |
+| TanStack Virtual                      | React 3.14.13; core 3.17.11 with a local patch | Measured Timeline/Thread viewports                                                  |
+| React Hook Form / Zod                 | 7.89.0 / 4.6.5                                 | Editable form state and validation of API/storage inputs                            |
+| Tailwind CSS / Lucide React           | 4.3.3 / 1.52.0                                 | Styling tokens and icons; native dialogs supply modal behavior                      |
+| MSW                                   | 2.15.0                                         | Browser HTTP simulation in development and production                               |
+| Vitest / Testing Library / Playwright | 5.0.3 / React 16.3.3 / 1.63.0                  | Unit, component, integration, and browser tests                                     |
+
+IndexedDB, Service Workers, Web Crypto, Web Locks, and ResizeObserver provide the browser runtime capabilities without an additional persistence or realtime framework.
+
+## Engineering highlights
+
+**Explicit state ownership.** Query owns confirmed resources; Redux owns serializable coordination; forms and presentation state stay local; URL parameters own filters and navigation targets. ESLint enforces `app → features → entities → shared` dependencies. Runtime services live outside Redux and dispose asynchronous work on identity changes.
+
+**Virtualization with bounded acquisition.** Timeline and Threads share a measured stream with stable logical keys and focus retention. History arrives in windows of up to 60 records; a locator retrieves a distant target without loading every intervening page. Demo datasets reach 50,000 entries. Virtualization bounds mounted DOM, while acquired cache windows and whole-bucket mock storage still have scaling costs. A [version-specific wheel compensation patch](docs/timeline-wheel-compensation.md) has dedicated regression coverage; touch/drag scrolling remains under investigation.
+
+**Durable optimistic delivery.** Sending atomically transfers a draft into an identity-scoped IndexedDB outbox before clearing the editor. A stable mutation ID joins HTTP confirmations and realtime echoes into one logical message. An unknown outcome is looked up before explicit retry; restored work is never blindly resent. This protects against duplicate delivery without promising background offline messaging.
+
+**Realtime recovery before Connected.** Independent clients poll a retained event journal through a replaceable transport. The coordinator buffers live events, synchronizes to an authoritative boundary, applies revisions, and commits checkpoints after successful application. Expired checkpoints trigger resource snapshots. Presence and typing use an ephemeral worker and stay outside persistent incident history.
+
+**Conflict-aware postmortems.** Document and Action Item saves use separate expected revisions. A stale save is rejected while local edits remain available for review/reload. This demonstrates shared editing without a CRDT or automatic text merge. Search and Notifications likewise use bounded, identity-scoped resources rather than deriving everything from loaded Timeline content.
+
+See [Technical Architecture](docs/technical-architecture.md) for contracts, lifecycle rules, and maintenance trade-offs.
+
+## Getting started
+
+Use **Node.js 24.x** and **pnpm 11.19.0**, as required by `engines` and `packageManager`. Use a current browser with Service Workers, IndexedDB, and Web Crypto on localhost or HTTPS. Web Locks is also required for destructive Demo maintenance.
 
 ```sh
+pnpm --version # must report 11.19.0
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open `http://localhost:3000` and sign in as `river.vale@example.test` with the fictional password `Fictional-pass-42`. No environment variables or secrets required. Never enter real passwords or incident data.
+Open `http://localhost:3000`. No application environment variables, credentials, or external database are required.
 
-## Engineering highlights
+Production preview:
 
-- **50k variable-height Timeline:** TanStack Virtual, bounded DOM, keyed anchor preservation and deep navigation into unloaded history.
-- **Durable optimistic delivery:** IndexedDB draft/outbox, stable mutation identity, ambiguous-outcome reconciliation and safe explicit retries.
-- **Realtime convergence:** replaceable simulated transport, retained event journal, committed checkpoints, reconnect/resync and duplicate/out-of-order handling.
-- **Contextual Threads:** flat discussions with independent virtualization, deep links and shared realtime reconciliation.
-- **Server-style discovery:** authority-backed Search, recipient Notifications and keyboard Command Palette without downloading complete client histories.
-- **Conflict-safe collaboration:** revision/CAS-based Postmortem and Action Item editing; dirty local fields survive remote updates and rejected stale saves.
+```sh
+pnpm build
+pnpm start
+```
 
-## What to try
-
-1. **Large Timeline:** open **INC-2841**, load older history or follow an old target. Demo Mode can replace its dataset with 10k/50k entries.
-2. **Optimistic messaging:** send with Ctrl/Cmd+Enter (Enter inserts a newline); observe one logical item reconcile on confirmation. Demo latency makes delivery states easier to inspect.
-3. **Two-tab convergence:** open INC-2841 in another same-origin tab and send activity; independent clients converge without reload.
-4. **Reconnect/resync:** Demo Mode → Disconnect → Generate persistent event → Reconnect. Missed activity appears through authoritative resync.
-5. **Contextual navigation:** open a Thread, search `Aurora`, or visit `/app/incidents/INC-2841?thread=fictional-incident-2841:evt-42` for the old 2k discussion. Ctrl/Cmd+K opens the palette outside editable fields.
-6. **Collaborative conflicts:** River initiates **INC-2865** Postmortem; Sage edits as a participant in a second client. Save competing edits to inspect stale-save rejection, Review latest and Reload latest.
-
-## Demo credentials
+## Demo data and limitations
 
 | Fictional user | Email                    | Public demo password | Role   |
 | -------------- | ------------------------ | -------------------- | ------ |
 | River Vale     | river.vale@example.test  | Fictional-pass-42    | Admin  |
 | Sage Linden    | sage.linden@example.test | Fictional-pass-42    | Member |
 
-River is the recommended reviewer identity. Orbit Workshop and all incident data are fictional. Registration creates a browser-stored fictional account; recovery sends no email. Same-origin tabs share fictional authority data; browser profiles/devices do not.
+Use River for the initial walkthrough. Orbit Workshop and all fixtures are fictional; enter only fictional accounts, passwords, and incident content. Registration stores a demo account in this browser; password recovery sends no email.
 
-## Demo Mode
+Open INC-2841 for the Timeline, search `Aurora`, or initiate INC-2865's postmortem. Ctrl/Cmd+Enter sends a message; Enter inserts a newline. Ctrl/Cmd+K opens the palette outside editable controls. To inspect recovery, use **Demo tools → Disconnect → Generate persistent event → Reconnect**. Two tabs on the same origin share fictional authority data while keeping independent client runtimes.
 
-Expand the labelled **Demo Mode** panel above the product surface:
+Demo tools expose latency, deterministic failures, event generation, and 100/1k/10k/50k Timeline replacement. **Replacement/reset remove demo work; close other app tabs and read the confirmation first.** Clear simulations changes configuration only. Simulation settings return to defaults on reload.
 
-- Request latency: **0 / 500 / 2,000 / 5,000 ms**; deterministic pre-persistence failures: **0 / 10 / 30%**.
-- Actual coordinator disconnect/reconnect and persistent monitoring, deployment, human-message or authorized forward-status generation.
-- Confirmed Timeline replacement: **100 / 1k / 10k / 50k**; full fictional-data reset or configuration-only Clear simulations.
+- The backend, authentication, and realtime transport are simulated. Storage belongs to one origin/browser profile; devices, profiles, and deployment hostnames do not share it.
+- Ordinary commander status/severity/participant/transfer/important-entry controls are incomplete. Existing policies and Demo status generation do not implement that workflow.
+- Mobile touch-like or drag scrolling can still move the viewport unexpectedly. The wheel patch does not resolve all mobile scrolling paths.
+- Postmortem browser Back/Forward lacks an unsaved-work guard; reset across databases is not globally atomic. No attachments, rich text, real integrations, or background offline delivery.
+- Large fixtures test functional behavior and bounded DOM, not measured FPS, throughput, or full device/accessibility certification.
 
-Configuration is tab-local and returns to defaults on reload. **Replacement/reset are destructive: read the confirmation and close other app tabs first.** [Detailed scheduling, event and maintenance semantics](docs/technical-architecture.md#demo-control-semantics) remain in technical documentation.
+The [requirement mapping and maintenance limitations](docs/portfolio-audit.md) distinguish implemented behavior from accepted product requirements.
 
-## Architecture
+## Project structure
 
-State has explicit owners:
-
-- **TanStack Query:** validated confirmed server-style resources and bounded acquisition windows.
-- **Redux Toolkit:** serializable session, connection and local-mutation coordination plus Demo configuration; no service instances or confirmed-resource mirror.
-- **React Hook Form / local React state:** editable forms, dialogs and presentation state.
-- **IndexedDB:** durable identity-scoped local drafts/outbox, separate from the fictional server's authority databases.
-- **URL:** filters, sort and Timeline/Thread/message navigation targets.
-
-`app → features → entities → shared` boundaries are lint-enforced. Runtime services own cancellation/disposal outside React rendering and Redux. [Technical Architecture](docs/technical-architecture.md) explains delivery races, checkpoint commits, sparse target windows, cache ownership and conflict handling.
-
-## Tech stack
-
-Next.js **16.3.8**, React **19.3**, strict TypeScript **5.9**, RTK **2.13** / react-redux **9**, TanStack Query **5**, Virtual **3**, React Hook Form **7**, Zod **4**, Tailwind **4**, MSW **2**. Native HTML dialogs, Service Workers, IndexedDB, Web Crypto, Web Locks, AbortController and ResizeObserver; no additional UI or realtime framework.
+```text
+src/app/          Next.js routes, providers, shell, and cross-feature composition
+src/features/     Session, incidents, messaging, realtime, discovery, postmortem, Demo
+src/entities/     Validated models, query keys, filters, and domain policies
+src/shared/       Messaging/persistence primitives, Query setup, UI, diagnostics
+tests/e2e/        Production browser journeys in desktop/mobile Chromium
+tests/dev-e2e/    Development startup, effect replay, and scroll regressions
+public/           MSW worker and fictional ephemeral realtime worker
+patches/          Pinned TanStack Virtual core patch
+docs/             Product specification, architecture, deployment, known limits
+```
 
 ## Testing
 
-Validated baseline: **319 Vitest unit/integration/component tests** and **166 Playwright E2E tests**, desktop/mobile Chromium. Coverage includes identity isolation, durable delivery races, multi-client realtime, reconnect/resync, old deep targets/anchors, Postmortem conflicts and large-history behavior. Playwright runs against production `next start`, not the development server.
+Vitest covers domain rules, authority transactions, cancellation, session isolation, delivery/realtime races, and component interactions. Playwright exercises production `next start`: direct routes, authentication/reload, native storage, independent clients, deep targets, responsive layouts, postmortem conflicts, and large datasets. A separate development suite checks Strict Mode startup and stream regressions.
 
 ```sh
 pnpm format:check
@@ -82,39 +130,26 @@ pnpm test
 pnpm build
 pnpm exec playwright install chromium
 pnpm test:e2e
+pnpm test:e2e:dev
 git diff --check
 ```
 
-On the original Windows development host, high-concurrency Playwright runs could become resource-sensitive; CI uses the stable two-worker configuration. For local inspection: `pnpm exec playwright test --workers=2 --retries=0`. [Detailed observations and unresolved cause](docs/portfolio-audit.md#renderingperformance) are retained in the audit; tests and CI have not been weakened.
+CI runs both browser suites. Production browser tests use two workers in CI; for the same local concurrency without retries, run `pnpm test:e2e --workers=2 --retries=0`. Development configuration uses one worker and no retries. Chromium device emulation does not verify physical Safari touch/momentum behavior.
 
-### Screenshot workflow
+## Deployment
 
-```sh
-pnpm build
-pnpm exec playwright test tests/e2e/demo.spec.ts --grep "reviewer showcase" --project desktop-chromium --workers=1 --retries=0
-pnpm exec playwright show-report
-```
+**Netlify deployment is pending.** Existing [netlify.toml](netlify.toml) selects `pnpm build`, `.next`, Node 24, frozen installation, and public dependency hoisting. Netlify's maintained [Next.js adapter](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/) handles App Router and direct routes. The app requires a normal Next.js deployment; MSW intentionally runs in the production browser.
 
-The fixed-seed showcase attaches six app-only PNGs: list, Timeline, Thread, Search, Demo and Postmortem. Desktop starts at 1280×720; Demo/Postmortem use 1280×900 after responsive checks. Output stays in ignored test/report directories, not committed binary assets or visual-regression baselines.
-
-## Local development
-
-Use Node **24** and **pnpm 11.19.0** (`packageManager` is pinned). Install with `pnpm install --frozen-lockfile`, run `pnpm dev`, then open `http://localhost:3000`. For production preview: `pnpm build` followed by `pnpm start`.
-
-Use a modern browser with Service Workers, IndexedDB and Web Crypto on localhost/HTTPS. Destructive Demo maintenance additionally requires Web Locks. No external database or environment secrets are needed. Hosting requirements and post-deployment smoke checks are in the [deployment guide](docs/deployment.md).
-
-## Known limitations
-
-- Fictional browser-backed backend/authentication, simulated polling transport rather than production WebSocket infrastructure, and no production server persistence/security.
-- The full commander operational workflow is intentionally outside the implemented portfolio scope: ordinary status/severity/participant/transfer/important-marking controls and their full audit command subsystem are not implemented. Demo is not a substitute; the [strict requirement audit](docs/portfolio-audit.md) preserves the accepted-specification gap.
-- No attachments, rich text or external integrations. Settings describes browser preferences, not an account-preference service.
-- Same-origin/browser-profile storage only. Reset across multiple databases is not globally atomic; Postmortem browser Back/Forward lacks an unsaved-work guard. Detailed recovery boundaries remain in the audit/architecture.
-- Whole-bucket mock scans and acquired Query windows limit stress scale; bounded DOM is not a throughput/FPS guarantee or accessibility/security certification.
-- Live deployment and remote HTTPS smoke are pending. License remains an owner decision; no license has been added. All demo fixtures are independently authored and fictional.
+The [deployment guide](docs/deployment.md) documents exact settings, worker/storage requirements, and the post-deployment HTTPS checklist. Local validation does not verify Netlify's build image, adapter, or CDN behavior.
 
 ## Documentation
 
-- [Product Specification](docs/product-spec.md): immutable accepted product requirements.
-- [Technical Architecture](docs/technical-architecture.md): implemented ownership, lifecycle, reconciliation and technical decisions.
-- [Portfolio Audit](docs/portfolio-audit.md): strict requirement mapping, accessibility/performance findings and known gaps.
-- [Deployment](docs/deployment.md): compatible hosting requirements, example setup and production smoke checklist.
+- [Product Specification](docs/product-spec.md): original accepted requirements, preserved unchanged.
+- [Technical Architecture](docs/technical-architecture.md): state ownership, runtime contracts, and operational decisions.
+- [Requirement mapping and limitations](docs/portfolio-audit.md): current gaps and maintenance considerations.
+- [Deployment guide](docs/deployment.md): Netlify setup and hosted verification.
+- [Virtualizer patch](docs/timeline-wheel-compensation.md) and [development diagnostics](docs/scroll-diagnostics.md): evidence, maintenance, and device verification.
+
+## License
+
+No license file is present. Licensing remains an owner decision.

@@ -1,6 +1,6 @@
 # Timeline wheel compensation: evidence and fix
 
-The October 12, 2026 recording demonstrates delayed measurement compensation in an iPhone-UA **wheel** session. This fix addresses that reproduced path. It does not establish that physical iPhone touch/momentum scrolling is free of other defects.
+The October 12, 2026 recording demonstrates delayed measurement compensation in an iPhone-UA **wheel** session. This fix addresses that reproduced path. Touch-like or drag-based scrolling can still move the viewport unexpectedly and remains under investigation. This patch does not establish that physical iPhone touch/momentum scrolling is free of other defects.
 
 ## Evidence
 
@@ -64,7 +64,22 @@ Production and development `ios-wheel-scroll.spec.ts` share `wheel-compensation-
 
 The opt-in development recorder is retained for physical-device verification because this supplied recording has no touch events. Production ignores its flag; listeners, sampling and instance wrappers attach only during explicit recording. No extra production diagnostic probes were added. Real Safari touch/momentum, elastic overscroll, trackpad behavior on iPad, IME and device timing still need manual checks. Re-run with diagnostics off when assessing timing/performance.
 
-## Verified local results
+## Upgrade and patch verification
+
+Keep the patch, patchedDependencies registration, and lockfile hash together. Before rebasing/removing it, inspect the installed core implementation and verify source, ESM/CJS runtime and declaration changes. Original source maps were not regenerated; review changed source rather than relying on generated line mappings.
+
+Run the existing installed-core tests and production/development browser regressions after a frozen install and production build:
+
+```sh
+pnpm test src/shared/ui/virtual-wheel-compensation.test.ts src/shared/ui/measured-stream.test.tsx
+pnpm build
+pnpm test:e2e tests/e2e/ios-wheel-scroll.spec.ts tests/e2e/timeline-scroll-stability.spec.ts tests/e2e/stream-scroll-ownership.spec.ts tests/e2e/threads.spec.ts --workers=2 --retries=0
+pnpm test:e2e:dev tests/dev-e2e/ios-wheel-scroll.spec.ts tests/dev-e2e/timeline-scroll.spec.ts
+```
+
+Also run the repository's complete checks before committing an upgrade. Verify wheel/touch transitions, pending touch corrections, prepend, first measurement, above/below-fold growth, targets, Latest, resize, Thread migration and 50k bounded DOM. Physical Safari touch/momentum and trackpad/keyboard checks remain manual; retain diagnostic evidence and do not infer full device correctness from an emulated UA.
+
+## Original patch validation evidence
 
 The final event-driven browser reproduction fails on clean baseline b733abb with one +427px deferred write and a **429px** same-anchor excursion. The patched production build passes in both device profiles with **0px** maximum excursion in all four cycles and no deferred-flush writes. The cycles issue 6, 3, 0 and 0 immediate compensation writes respectively, rather than repeating corrections while idle. The baseline unit run fails the two wheel-specific cases and passes all four touch/transition cases; the patched unit suite passes all six.
 
