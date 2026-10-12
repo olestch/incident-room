@@ -1,0 +1,271 @@
+diff --git a/src/index.ts b/src/index.ts
+index 38b7e42..7fbb317 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -470,6 +470,8 @@ export class Virtualizer<
+   // touchstart→touchend window (active drag) and a short tail after
+   // touchend (early-momentum window — iOS only fires touch events once at
+   // the start of momentum, so we use a timer rather than another event).
++  // Wheel input has no touch momentum to protect. Commit geometry and offset together.
++  private _iosWheelScrolling = false
+   private _iosTouching = false
+   private _iosJustTouchEnded = false
+   private _iosTouchEndTimerId: number | null = null
+@@ -754,7 +756,9 @@ export class Virtualizer<
+
+     if (
+       isIOSWebKit() &&
+-      (this.isScrolling || this._iosTouching || this._iosJustTouchEnded)
++      (this._iosTouching ||
++        this._iosJustTouchEnded ||
++        (this.isScrolling && !this._iosWheelScrolling))
+     ) {
+       this._iosDeferredAdjustment += delta
+       return false
+@@ -850,6 +854,7 @@ export class Virtualizer<
+     // pending reset of the flag), deferring every adjustment on the new
+     // element until its next touch cycle.
+     this._iosDeferredAdjustment = 0
++    this._iosWheelScrolling = false
+     this._iosTouching = false
+     this._iosJustTouchEnded = false
+     this._clampedAdjustment = null
+@@ -953,6 +958,7 @@ export class Virtualizer<
+             : null
+           this.scrollOffset = offset
+           this.isScrolling = isScrolling
++          if (!isScrolling) this._iosWheelScrolling = false
+
+           // Flush deferred iOS adjustments if we're now fully settled.
+           // "Fully settled" means: not actively scrolling, no finger on
+@@ -966,13 +972,24 @@ export class Virtualizer<
+         }),
+       )
+
+-      // Touch event listeners (iOS-aware deferral). We attach unconditionally
+-      // — the listeners are passive and cheap; on non-touch devices they
+-      // simply never fire. The gating by isIOSWebKit() lives in resizeItem
++      // Input event listeners (iOS-aware deferral). We attach unconditionally
++      // — the listeners are passive and cheap. They only track input flags.
++      // The gating by isIOSWebKit() lives in resizeItem
+       // and _flushIosDeferredIfReady so we only burn the path on iOS.
+       if ('addEventListener' in this.scrollElement) {
+         const scrollEl = this.scrollElement as unknown as EventTarget
++        const onWheel = () => {
++          // Do not take over a touch gesture or an already queued correction.
++          if (
++            !this._iosTouching &&
++            !this._iosJustTouchEnded &&
++            this._iosDeferredAdjustment === 0
++          ) {
++            this._iosWheelScrolling = true
++          }
++        }
+         const onTouchStart = () => {
++          this._iosWheelScrolling = false
+           this._iosTouching = true
+           this._iosJustTouchEnded = false
+           if (this._iosTouchEndTimerId !== null && this.targetWindow != null) {
+@@ -996,6 +1013,7 @@ export class Virtualizer<
+             this._flushIosDeferredIfReady()
+           }, 150)
+         }
++        scrollEl.addEventListener('wheel', onWheel, addEventListenerOptions)
+         scrollEl.addEventListener(
+           'touchstart',
+           onTouchStart,
+@@ -1007,6 +1025,7 @@ export class Virtualizer<
+           addEventListenerOptions,
+         )
+         this.unsubs.push(() => {
++          scrollEl.removeEventListener('wheel', onWheel)
+           scrollEl.removeEventListener('touchstart', onTouchStart)
+           scrollEl.removeEventListener('touchend', onTouchEnd)
+           if (this._iosTouchEndTimerId !== null && this.targetWindow != null) {
+@@ -1040,7 +1059,9 @@ export class Virtualizer<
+         // _flushIosDeferredIfReady handle it once the scroll settles.
+         if (
+           isIOSWebKit() &&
+-          (this.isScrolling || this._iosTouching || this._iosJustTouchEnded)
++          (this._iosTouching ||
++            this._iosJustTouchEnded ||
++            (this.isScrolling && !this._iosWheelScrolling))
+         ) {
+           if (anchorDelta !== 0) {
+             this._iosDeferredAdjustment += anchorDelta
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index 7032b66..b68fcb0 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -205,6 +205,7 @@ class Virtualizer {
+     this.scrollDirection = null;
+     this.scrollAdjustments = 0;
+     this._iosDeferredAdjustment = 0;
++    this._iosWheelScrolling = false;
+     this._iosTouching = false;
+     this._iosJustTouchEnded = false;
+     this._iosTouchEndTimerId = null;
+@@ -412,6 +413,7 @@ class Virtualizer {
+       this.isScrolling = false;
+       this.scrollDirection = null;
+       this._iosDeferredAdjustment = 0;
++      this._iosWheelScrolling = false;
+       this._iosTouching = false;
+       this._iosJustTouchEnded = false;
+       this._clampedAdjustment = null;
+@@ -464,6 +466,7 @@ class Virtualizer {
+             this.scrollDirection = isScrolling ? prevOffset === offset ? this.scrollDirection : prevOffset < offset ? "forward" : "backward" : null;
+             this.scrollOffset = offset;
+             this.isScrolling = isScrolling;
++            if (!isScrolling) this._iosWheelScrolling = false;
+             this._flushIosDeferredIfReady();
+             if (this.scrollState) {
+               this.scheduleScrollReconcile();
+@@ -473,7 +476,13 @@ class Virtualizer {
+         );
+         if ("addEventListener" in this.scrollElement) {
+           const scrollEl = this.scrollElement;
++          const onWheel = () => {
++            if (!this._iosTouching && !this._iosJustTouchEnded && this._iosDeferredAdjustment === 0) {
++              this._iosWheelScrolling = true;
++            }
++          };
+           const onTouchStart = () => {
++            this._iosWheelScrolling = false;
+             this._iosTouching = true;
+             this._iosJustTouchEnded = false;
+             if (this._iosTouchEndTimerId !== null && this.targetWindow != null) {
+@@ -493,6 +502,7 @@ class Virtualizer {
+               this._flushIosDeferredIfReady();
+             }, 150);
+           };
++          scrollEl.addEventListener("wheel", onWheel, addEventListenerOptions);
+           scrollEl.addEventListener(
+             "touchstart",
+             onTouchStart,
+@@ -504,6 +514,7 @@ class Virtualizer {
+             addEventListenerOptions
+           );
+           this.unsubs.push(() => {
++            scrollEl.removeEventListener("wheel", onWheel);
+             scrollEl.removeEventListener("touchstart", onTouchStart);
+             scrollEl.removeEventListener("touchend", onTouchEnd);
+             if (this._iosTouchEndTimerId !== null && this.targetWindow != null) {
+@@ -522,7 +533,7 @@ class Virtualizer {
+       if (anchor && this.scrollElement && this.options.enabled) {
+         const [key, _offset, followOnAppend, anchorDelta] = anchor;
+         if (key !== null && !followOnAppend) {
+-          if (isIOSWebKit() && (this.isScrolling || this._iosTouching || this._iosJustTouchEnded)) {
++          if (isIOSWebKit() && (this._iosTouching || this._iosJustTouchEnded || this.isScrolling && !this._iosWheelScrolling)) {
+             if (anchorDelta !== 0) {
+               this._iosDeferredAdjustment += anchorDelta;
+             }
+@@ -1193,7 +1204,7 @@ class Virtualizer {
+     if (process.env.NODE_ENV !== "production" && this.options.debug) {
+       console.info("correction", delta);
+     }
+-    if (isIOSWebKit() && (this.isScrolling || this._iosTouching || this._iosJustTouchEnded)) {
++    if (isIOSWebKit() && (this._iosTouching || this._iosJustTouchEnded || this.isScrolling && !this._iosWheelScrolling)) {
+       this._iosDeferredAdjustment += delta;
+       return false;
+     } else {
+diff --git a/dist/cjs/index.cjs b/dist/cjs/index.cjs
+index e519038..ce3da6c 100644
+--- a/dist/cjs/index.cjs
++++ b/dist/cjs/index.cjs
+@@ -207,6 +207,7 @@ class Virtualizer {
+     this.scrollDirection = null;
+     this.scrollAdjustments = 0;
+     this._iosDeferredAdjustment = 0;
++    this._iosWheelScrolling = false;
+     this._iosTouching = false;
+     this._iosJustTouchEnded = false;
+     this._iosTouchEndTimerId = null;
+@@ -414,6 +415,7 @@ class Virtualizer {
+       this.isScrolling = false;
+       this.scrollDirection = null;
+       this._iosDeferredAdjustment = 0;
++      this._iosWheelScrolling = false;
+       this._iosTouching = false;
+       this._iosJustTouchEnded = false;
+       this._clampedAdjustment = null;
+@@ -466,6 +468,7 @@ class Virtualizer {
+             this.scrollDirection = isScrolling ? prevOffset === offset ? this.scrollDirection : prevOffset < offset ? "forward" : "backward" : null;
+             this.scrollOffset = offset;
+             this.isScrolling = isScrolling;
++            if (!isScrolling) this._iosWheelScrolling = false;
+             this._flushIosDeferredIfReady();
+             if (this.scrollState) {
+               this.scheduleScrollReconcile();
+@@ -475,7 +478,13 @@ class Virtualizer {
+         );
+         if ("addEventListener" in this.scrollElement) {
+           const scrollEl = this.scrollElement;
++          const onWheel = () => {
++            if (!this._iosTouching && !this._iosJustTouchEnded && this._iosDeferredAdjustment === 0) {
++              this._iosWheelScrolling = true;
++            }
++          };
+           const onTouchStart = () => {
++            this._iosWheelScrolling = false;
+             this._iosTouching = true;
+             this._iosJustTouchEnded = false;
+             if (this._iosTouchEndTimerId !== null && this.targetWindow != null) {
+@@ -495,6 +504,7 @@ class Virtualizer {
+               this._flushIosDeferredIfReady();
+             }, 150);
+           };
++          scrollEl.addEventListener("wheel", onWheel, addEventListenerOptions);
+           scrollEl.addEventListener(
+             "touchstart",
+             onTouchStart,
+@@ -506,6 +516,7 @@ class Virtualizer {
+             addEventListenerOptions
+           );
+           this.unsubs.push(() => {
++            scrollEl.removeEventListener("wheel", onWheel);
+             scrollEl.removeEventListener("touchstart", onTouchStart);
+             scrollEl.removeEventListener("touchend", onTouchEnd);
+             if (this._iosTouchEndTimerId !== null && this.targetWindow != null) {
+@@ -524,7 +535,7 @@ class Virtualizer {
+       if (anchor && this.scrollElement && this.options.enabled) {
+         const [key, _offset, followOnAppend, anchorDelta] = anchor;
+         if (key !== null && !followOnAppend) {
+-          if (isIOSWebKit() && (this.isScrolling || this._iosTouching || this._iosJustTouchEnded)) {
++          if (isIOSWebKit() && (this._iosTouching || this._iosJustTouchEnded || this.isScrolling && !this._iosWheelScrolling)) {
+             if (anchorDelta !== 0) {
+               this._iosDeferredAdjustment += anchorDelta;
+             }
+@@ -1195,7 +1206,7 @@ class Virtualizer {
+     if (process.env.NODE_ENV !== "production" && this.options.debug) {
+       console.info("correction", delta);
+     }
+-    if (isIOSWebKit() && (this.isScrolling || this._iosTouching || this._iosJustTouchEnded)) {
++    if (isIOSWebKit() && (this._iosTouching || this._iosJustTouchEnded || this.isScrolling && !this._iosWheelScrolling)) {
+       this._iosDeferredAdjustment += delta;
+       return false;
+     } else {
+diff --git a/dist/esm/index.d.ts b/dist/esm/index.d.ts
+index 039bff8..2671903 100644
+--- a/dist/esm/index.d.ts
++++ b/dist/esm/index.d.ts
+@@ -110,6 +110,7 @@ export declare class Virtualizer<TScrollElement extends Element | Window, TItemE
+     scrollDirection: ScrollDirection | null;
+     scrollAdjustments: number;
+     private _iosDeferredAdjustment;
++    private _iosWheelScrolling;
+     private _iosTouching;
+     private _iosJustTouchEnded;
+     private _iosTouchEndTimerId;
+diff --git a/dist/cjs/index.d.cts b/dist/cjs/index.d.cts
+index c6f7ce7..36ed3bf 100644
+--- a/dist/cjs/index.d.cts
++++ b/dist/cjs/index.d.cts
+@@ -110,6 +110,7 @@ export declare class Virtualizer<TScrollElement extends Element | Window, TItemE
+     scrollDirection: ScrollDirection | null;
+     scrollAdjustments: number;
+     private _iosDeferredAdjustment;
++    private _iosWheelScrolling;
+     private _iosTouching;
+     private _iosJustTouchEnded;
+     private _iosTouchEndTimerId;

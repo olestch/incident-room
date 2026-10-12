@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@tanstack/virtual-core@3.17.11': 249d9a26db8311017e00821a777fd4efc355e08665e497040b3b5cbe7aae8b51
+
 importers:
 
   .:
@@ -3594,11 +3597,11 @@ snapshots:
 
   '@tanstack/react-virtual@3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@tanstack/virtual-core': 3.17.11
+      '@tanstack/virtual-core': 3.17.11(patch_hash=249d9a26db8311017e00821a777fd4efc355e08665e497040b3b5cbe7aae8b51)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@tanstack/virtual-core@3.17.11': {}
+  '@tanstack/virtual-core@3.17.11(patch_hash=249d9a26db8311017e00821a777fd4efc355e08665e497040b3b5cbe7aae8b51)': {}
 
   '@testing-library/dom@10.4.2':
     dependencies:

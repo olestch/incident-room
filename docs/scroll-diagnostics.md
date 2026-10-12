@@ -1,6 +1,6 @@
-# Temporary Timeline scroll diagnostics
+# Opt-in Timeline scroll diagnostics
 
-This opt-in tool collects geometry evidence; it does not fix the unresolved mobile backward movement. Production ignores the flag.
+This opt-in tool collects geometry evidence. The recorded iPhone-UA wheel compensation defect has a focused fix; see [evidence and limits](timeline-wheel-compensation.md). Physical iPhone touch/momentum remains unverified. Production ignores the flag.
 
 ## Record and export
 
@@ -37,4 +37,4 @@ No Timeline React state changes occur per event/frame. Only the isolated panel r
 
 `getBoundingClientRect`, scroll/client dimensions and geometry comparison may trigger synchronous layout reads. These are necessary to distinguish visual motion from native scroll motion, but recording can influence frame timing; repeat with recording off when assessing performance. There is no zero-overhead/FPS claim. Idle polling can miss a transient excursion shorter than 250ms outside a settling window; browser frames may coalesce subframe writes. Committed virtual geometry can lag a measurement until React commits, intentionally exposing that ordering. Events before Start, or before a newly mounted stream attaches its layout-effect probes, are not captured retroactively. Ancillary layout shifts are inferred from bounds, not collected via a global PerformanceObserver. Background-tab rAF throttling, real-device momentum/IME behavior and clipboard policies require manual testing. Copy falls back to local text selection on browsers without Clipboard API; Download is independent of clipboard permissions.
 
-The original mobile defect remains unresolved. Collect a real reproduction before proposing any remediation. Remove the provider, debug props/command probes, and the two scroll diagnostic modules/tests when the investigation is complete.
+Retain this development-only recorder for physical-device verification: the supplied recording contains wheel events and no touch input. No caller stack probe was added to runtime code; stack attribution lives only in regression tests. Remove the provider, debug props/command probes, and the two diagnostic modules/tests once remaining device verification no longer needs them.

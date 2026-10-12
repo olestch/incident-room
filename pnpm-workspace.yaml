@@ -3,3 +3,5 @@ allowBuilds:
   msw: true
   sharp: true
   unrs-resolver: true
+patchedDependencies:
+  '@tanstack/virtual-core@3.17.11': patches/@tanstack__virtual-core@3.17.11.patch
