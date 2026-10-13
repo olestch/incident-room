@@ -14,16 +14,23 @@ The application uses fictional accounts and browser-local storage. See [demo cre
 
 ## Screenshots
 
-Screenshots have not been committed. The planned visual overview is:
+Captured from the local production build with fresh browser contexts and fictional demo data. The hosted Netlify badge overlapped the mobile composer, so the gallery uses the same application build without that hosting overlay. Static captures do not verify mobile scrolling.
 
-| Screen                   | Capture instructions                                                                                                                                |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Incident list            | Sign in as River; capture `/app/incidents` at 1280 × 900 with the filters collapsed and Demo tools closed.                                          |
-| Incident Room and Thread | Open `/app/incidents/INC-2841?thread=fictional-incident-2841:evt-4000` at 1280 × 900; wait for Timeline and Thread content and the Connected state. |
-| Postmortem               | Open `/app/incidents/INC-2865/postmortem`, initiate the postmortem as River, and show the editor with one fictional Action Item at 1280 × 900.      |
-| Mobile Room              | Capture `/app/incidents/INC-2841` at 390 × 844 with incident context and Thread closed, showing Timeline and composer.                              |
+**Incident list** — populated incidents with severity, status, assignment, and URL-owned filters.
 
-Use a fresh browser profile and default dataset for repeatable captures. Save app-only PNGs under `docs/screenshots/` and embed them here once reviewed. The current tests do not generate a screenshot gallery; a static capture does not verify mobile scrolling.
+![Incident list showing fictional incidents, severity and lifecycle badges, commanders, and closed filter popovers](docs/screenshots/incident-list.png)
+
+**Incident Room** — incident context, connected Timeline, and the discussion attached to a deployment event.
+
+![INC-2841 showing incident context beside the connected virtualized Timeline and open Thread, with both message composers visible](docs/screenshots/incident-room-thread.png)
+
+**Postmortem** — a saved resolution, linked Timeline evidence, and an assigned follow-up with a due date.
+
+![Postmortem editor showing a fictional resolution, selected deployment evidence, and an Action Item assigned to Sage Linden](docs/screenshots/postmortem.png)
+
+**Mobile Room** — Timeline and composer, with the native Incident context control and Thread closed.
+
+![Mobile Incident Room showing the context control, connected Timeline, deployment update, and unobscured message composer](docs/screenshots/mobile-incident-room.png)
 
 ## Key functionality
 
