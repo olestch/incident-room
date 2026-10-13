@@ -8,7 +8,9 @@ This is a demo application, not a production incident management service.
 
 ## Live demo
 
-**Not deployed yet.** Netlify deployment is pending review. The live demo URL will be added here after deployment and HTTPS verification.
+**[Open the live demo](https://incident-room.netlify.app/)** · Hosted on Netlify.
+
+The application uses fictional accounts and browser-local storage. See [demo credentials and limitations](#demo-data-and-limitations). Hosted HTTPS smoke verification is still pending.
 
 ## Screenshots
 
@@ -138,9 +140,9 @@ CI runs both browser suites. Production browser tests use two workers in CI; for
 
 ## Deployment
 
-**Netlify deployment is pending.** Existing [netlify.toml](netlify.toml) selects `pnpm build`, `.next`, Node 24, frozen installation, and public dependency hoisting. Netlify's maintained [Next.js adapter](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/) handles App Router and direct routes. The app requires a normal Next.js deployment; MSW intentionally runs in the production browser.
+**Deployed on [Netlify](https://incident-room.netlify.app/).** Existing [netlify.toml](netlify.toml) selects `pnpm build`, `.next`, Node 24, frozen installation, and public dependency hoisting. Netlify's maintained [Next.js adapter](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/) handles App Router and direct routes. The app requires a normal Next.js deployment; MSW intentionally runs in the production browser.
 
-The [deployment guide](docs/deployment.md) documents exact settings, worker/storage requirements, and the post-deployment HTTPS checklist. Local validation does not verify Netlify's build image, adapter, or CDN behavior.
+The [deployment guide](docs/deployment.md) documents exact settings, worker/storage requirements, and the post-deployment HTTPS checklist. The deployment completed, but the hosted HTTPS smoke checklist has not yet been independently verified.
 
 ## Documentation
 
